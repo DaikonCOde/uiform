@@ -6,6 +6,10 @@ import { createHeadlessForm, type Field, type JsfObjectSchema, type SchemaValue,
 import { useFieldRenderer } from "../hooks/useFieldRenderer";
 import { formValuesToJsonValues, getDefaultValuesFromFields } from "../utils/utils";
 
+import locale from 'antd/locale/es_ES'
+import 'dayjs/locale/es'
+import { ConfigProvider } from "antd";
+
 const jsonSchemaDemo: JsfObjectSchema = {
   "type": "object",
   "additionalProperties": false,
@@ -130,42 +134,46 @@ function SmartForm({ name, fields, initialValues, handleValidation, onSubmit }: 
   }
 
   return (
-    <form name={name} onSubmit={handleSubmit} noValidate>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {fields?.map((field, index) => {
-          const fieldWithProps = {
-            ...field,
-            value: values?.[field.name],
-            error: errors[field.name],
-            submitted,
-            onChange: (fieldName: string, value: any) => {
-              const newValues = {
-                ...values,
-                [fieldName]: value
-              };
-              setValues(newValues);
-              handleInternalValidation(newValues);
-            }
-          };
-
-          return renderField(fieldWithProps, index);
-        })}
-      </div>
-
-      <button 
-        type="submit" 
-        style={{ 
-          marginTop: '24px',
-          padding: '8px 24px',
-          backgroundColor: '#1890ff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
+      <ConfigProvider
+        locale={locale}
       >
-        Submit
-      </button>
-    </form>
+      <form name={name} onSubmit={handleSubmit} noValidate>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {fields?.map((field, index) => {
+            const fieldWithProps = {
+              ...field,
+              value: values?.[field.name],
+              error: errors[field.name],
+              submitted,
+              onChange: (fieldName: string, value: any) => {
+                const newValues = {
+                  ...values,
+                  [fieldName]: value
+                };
+                setValues(newValues);
+                handleInternalValidation(newValues);
+              }
+            };
+
+            return renderField(fieldWithProps, index);
+          })}
+        </div>
+
+        <button 
+          type="submit" 
+          style={{ 
+            marginTop: '24px',
+            padding: '8px 24px',
+            backgroundColor: '#1890ff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Submit
+        </button>
+      </form>
+    </ConfigProvider>
   );
 }

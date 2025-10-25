@@ -3,6 +3,7 @@ import { Card, Button, Space, Popconfirm } from 'antd'
 import { PlusOutlined, DeleteOutlined, DragOutlined } from '@ant-design/icons'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { GroupArrayFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 interface GroupArrayFieldPropsExtended extends GroupArrayFieldProps {
   renderField: (field: any, index: number) => React.ReactNode
@@ -87,23 +88,16 @@ export function GroupArrayField({
   const canRemove = arrayValue.length > minItems
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required}
         description={description}
       />
       
-      <div style={{ marginTop: '8px' }}>
+      <div className={styles.arrayContainer}>
         {arrayValue.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '20px', 
-            color: 'rgba(0, 0, 0, 0.45)',
-            border: '1px dashed #d9d9d9',
-            borderRadius: '6px',
-            marginBottom: '8px'
-          }}>
+          <div className={styles.arrayEmpty}>
             No items yet. Click "Add Item" to get started.
           </div>
         ) : (
@@ -117,7 +111,7 @@ export function GroupArrayField({
                     { borderColor: '#ff4d4f' } : {})
                 }}
                 title={
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className={styles.arrayItemHeader}>
                     <Space>
                       {allowReorder && (
                         <DragOutlined style={{ cursor: 'grab', color: 'rgba(0, 0, 0, 0.45)' }} />
@@ -159,7 +153,7 @@ export function GroupArrayField({
                 // TODO: validar que props se usarán para el card
                 // {...cardProps}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className={styles.arrayItemFields}>
                   {fields.map((field, fieldIndex) => {
                     const nestedField = {
                       ...field,
@@ -185,7 +179,7 @@ export function GroupArrayField({
                 {/* Mostrar errores específicos del item */}
                 {(isTouched || submitted) && error && Array.isArray(error) && 
                  error[index] && typeof error[index] === 'string' && (
-                  <div style={{ marginTop: '8px' }}>
+                  <div className={styles.arrayItemError}>
                     <ErrorMessage error={error[index]} fieldName={`${name}[${index}]`} />
                   </div>
                 )}
@@ -199,7 +193,7 @@ export function GroupArrayField({
             type="dashed" 
             onClick={handleAddItem}
             icon={<PlusOutlined />}
-            style={{ width: '100%', marginTop: '8px' }}
+            className={styles.arrayAddButton}
           >
             {addButtonText}
           </Button>
@@ -212,12 +206,7 @@ export function GroupArrayField({
         
         {/* Mostrar información de límites */}
         {(minItems > 0 || maxItems) && (
-          <div style={{ 
-            fontSize: '12px', 
-            color: 'rgba(0, 0, 0, 0.45)', 
-            marginTop: '4px',
-            textAlign: 'center'
-          }}>
+          <div className={styles.arrayLimits}>
             {minItems > 0 && `Min: ${minItems}`}
             {minItems > 0 && maxItems && ' • '}
             {maxItems && `Max: ${maxItems}`}

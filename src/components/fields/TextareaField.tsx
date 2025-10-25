@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { Input } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { TextareaFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 const { TextArea } = Input
 
@@ -62,7 +63,7 @@ export function TextareaField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required} 

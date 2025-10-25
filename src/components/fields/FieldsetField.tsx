@@ -2,6 +2,7 @@ import React from 'react'
 import { Card } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { FieldsetFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 interface FieldsetFieldPropsExtended extends FieldsetFieldProps {
   renderField: (field: any, index: number) => React.ReactNode
@@ -42,12 +43,12 @@ export function FieldsetField({
   ) : undefined
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <Card
         title={cardTitle}
         size={size}
+        className={styles.fieldsetCard}
         style={{
-          marginBottom: '16px',
           ...(error && (touched || submitted) ? { borderColor: '#ff4d4f' } : {})
         }}
         {...Object.fromEntries(
@@ -57,19 +58,12 @@ export function FieldsetField({
         )}
       >
         {!hasTitle && description && (
-          <div 
-            style={{
-              fontSize: '12px',
-              color: 'rgba(0, 0, 0, 0.45)',
-              marginBottom: '12px',
-              lineHeight: '1.3'
-            }}
-          >
+          <div className={styles.fieldsetDescription}>
             {description}
           </div>
         )}
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className={styles.fieldsetContainer}>
           {fields.map((field, index) => {
             // Crear un campo con el name prefijado para objetos anidados
             const nestedField = {

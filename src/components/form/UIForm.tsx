@@ -1,9 +1,15 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { createHeadlessForm } from '@remoteoss/json-schema-form'
+import { 
+  createHeadlessForm, 
+  generateCSSGridProperties,
+  getFieldLayoutInfo 
+} from '@remoteoss/json-schema-form'
 import { Form, Button, Space, Alert } from 'antd'
 import { useFieldRenderer } from '../../hooks/useFieldRenderer'
 import { formValuesToJsonValues, getDefaultValuesFromFields } from '../../utils/utils'
+import { useResponsiveCSS } from '../../utils/responsive-layout'
 import type { UIFormProps } from '../../types'
+import styles from './UIForm.module.css'
 
 export function UIForm({
   schema,
@@ -22,12 +28,12 @@ export function UIForm({
     showRequiredMark = true,
     validateTrigger = 'onChange',
     size = 'middle',
-    layout = 'vertical',
+    layout = 'horizontal',
     disabled = false
   } = config
 
   // Crear formulario headless con json-schema-form
-  const { fields, handleValidation, isError, error } = useMemo(() => {
+  const { fields, handleValidation, isError, error, layout: containerLayout } = useMemo(() => {
     try {
       return createHeadlessForm(schema, {
         strictInputType: false,
@@ -39,7 +45,8 @@ export function UIForm({
         fields: [], 
         handleValidation: () => ({ formErrors: { '': 'Error initializing form' } }),
         isError: true,
-        error: 'Failed to initialize form from schema'
+        error: 'Failed to initialize form from schema',
+        layout: null
       }
     }
   }, [schema, initialValues])
@@ -51,6 +58,26 @@ export function UIForm({
   const [errors, setErrors] = useState<Record<string, any>>({})
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Generar ID único para el formulario
+  const formId = useMemo(() => Math.random().toString(36).substr(2, 9), [])
+  
+
+  // Hook para manejar CSS responsivo automáticamente
+  const { containerClassName, getFieldClassName } = useResponsiveCSS(
+    fields, 
+    containerLayout, 
+    formId
+  )
+
+  // Generar estilos CSS para el layout del contenedor
+  const containerStyle = useMemo(() => {
+    if (containerLayout) {
+      return generateCSSGridProperties(containerLayout)
+    }
+    // Estilo por defecto si no hay layout definido
+    return { display: 'flex', flexDirection: 'column' as const, gap: '16px' }
+  }, [containerLayout])
 
   // Hook para renderizar campos
   const { renderField } = useFieldRenderer({
@@ -101,7 +128,7 @@ export function UIForm({
   }, [values, validateTrigger, validateValues, onChange])
 
   // Manejar blur de campo
-  const handleFieldBlur = useCallback((fieldName: string) => {
+  const handleFieldBlur = useCallback((_fieldName: string) => {
     if (validateTrigger === 'onBlur') {
       const validation = validateValues(values)
       onChange?.(validation.jsonValues, validation.errors)
@@ -172,12 +199,15 @@ export function UIForm({
             message={errors['']}
             type="error"
             showIcon
-            style={{ marginBottom: '16px' }}
+            className={styles.formError}
           />
         )}
 
-        {/* Renderizar campos */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Renderizar campos con layout */}
+        <div 
+          style={containerStyle}
+          className={containerClassName}
+        >
           {fields.map((field, index) => {
             const fieldWithProps = {
               ...field,
@@ -188,8 +218,17 @@ export function UIForm({
               onBlur: handleFieldBlur
             }
 
+            // Obtener layout específico del campo
+            const fieldLayout = getFieldLayoutInfo(field)
+            const fieldStyle = fieldLayout ? generateCSSGridProperties(fieldLayout) : {}
+            const fieldClassName = getFieldClassName(field.name)
+
             return (
-              <Form.Item key={`${field.name}-${index}`} style={{ marginBottom: 0 }}>
+              <Form.Item 
+                key={`${field.name}-${index}`} 
+                style={fieldStyle}
+                className={`${styles.fieldItem} ${fieldClassName}`}
+              >
                 {renderField(fieldWithProps, index)}
               </Form.Item>
             )
@@ -198,7 +237,7 @@ export function UIForm({
 
         {/* Botón de envío por defecto si se proporciona onSubmit */}
         {onSubmit && !children && (
-          <Form.Item style={{ marginTop: '24px', marginBottom: 0 }}>
+          <Form.Item className={styles.submitContainer}>
             <Space>
               <Button
                 type="primary"
@@ -226,7 +265,7 @@ export function UIForm({
 
         {/* Contenido personalizado (botones, etc.) */}
         {children && (
-          <Form.Item style={{ marginTop: '24px', marginBottom: 0 }}>
+          <Form.Item className={styles.submitContainer}>
             {children}
           </Form.Item>
         )}

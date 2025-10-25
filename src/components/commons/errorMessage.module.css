@@ -1,0 +1,22 @@
+.error {
+  color: #ff4d4f;
+  font-size: 0.80rem;
+  margin-top: 4px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.errorContainer {
+  margin-top: 4px;
+  text-align: left;
+}
+
+.errorItem {
+  color: #ff4d4f;
+  font-size: 0.80rem;
+  line-height: 1.2;
+}
+
+.errorItemSpaced {
+  margin-top: 2px;
+}

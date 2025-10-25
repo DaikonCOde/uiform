@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Checkbox } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { CheckboxFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 export function CheckboxField({
   name,
@@ -76,7 +77,7 @@ export function CheckboxField({
   const showSeparateLabel = label && children && label !== children
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       {showSeparateLabel && (
         <FieldLabel 
           label={label} 
@@ -86,20 +87,13 @@ export function CheckboxField({
         />
       )}
       
-      <div style={{ marginTop: showSeparateLabel ? 0 : undefined }}>
+      <div className={styles.checkboxContainer}>
         <Checkbox {...checkboxProps}>
           {checkboxLabel}
         </Checkbox>
         
         {!showSeparateLabel && description && (
-          <div 
-            style={{
-              fontSize: '12px',
-              color: 'rgba(0, 0, 0, 0.45)',
-              marginTop: '4px',
-              lineHeight: '1.3'
-            }}
-          >
+          <div className={styles.checkboxDescription}>
             {description}
           </div>
         )}

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { InputNumber } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { NumberFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 export function NumberField({
   name,
@@ -73,7 +74,7 @@ export function NumberField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required} 

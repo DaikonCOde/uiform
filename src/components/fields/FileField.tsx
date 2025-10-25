@@ -4,6 +4,7 @@ import { UploadOutlined, InboxOutlined } from '@ant-design/icons'
 import type { UploadProps, UploadFile, RcFile } from 'antd/es/upload/interface'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { FileFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 const { Dragger } = Upload
 
@@ -176,7 +177,7 @@ export function FileField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required}
@@ -186,11 +187,7 @@ export function FileField({
       {renderUploadComponent()}
       
       {maxFileSize && (
-        <div style={{ 
-          fontSize: '12px', 
-          color: 'rgba(0, 0, 0, 0.45)', 
-          marginTop: '4px' 
-        }}>
+        <div className={styles.fileHint}>
           Max file size: {Math.round(maxFileSize / 1024 / 1024)}MB
         </div>
       )}

@@ -1,0 +1,124 @@
+/* Ejemplo de personalización de estilos usando CSS Modules */
+
+/* Personalizar el formulario completo */
+.customForm {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Personalizar campos individuales */
+.customForm :global(.field) {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Personalizar labels */
+.customForm :global(.label) {
+  font-weight: 600;
+  font-size: 14px;
+  color: #667eea;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Personalizar el indicador requerido */
+.customForm :global(.required) {
+  color: #e74c3c;
+  font-size: 16px;
+}
+
+/* Personalizar descripciones */
+.customForm :global(.description) {
+  font-style: italic;
+  color: #7f8c8d;
+  font-size: 12px;
+}
+
+/* Personalizar mensajes de error */
+.customForm :global(.error) {
+  background: #fee;
+  border-left: 3px solid #e74c3c;
+  padding: 8px;
+  border-radius: 4px;
+  color: #c0392b;
+  font-weight: 500;
+}
+
+/* Personalizar botón de submit */
+.customForm :global(.submitContainer) button[type="submit"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.customForm :global(.submitContainer) button[type="submit"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Personalizar arrays */
+.customForm :global(.arrayEmpty) {
+  background: #ecf0f1;
+  border: 2px dashed #95a5a6;
+  color: #7f8c8d;
+  padding: 32px;
+  text-align: center;
+  border-radius: 8px;
+  font-style: italic;
+}
+
+.customForm :global(.arrayAddButton) {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.customForm :global(.arrayAddButton):hover {
+  background: #667eea;
+  color: white;
+}
+
+/* Tema oscuro alternativo */
+.darkForm {
+  background: #1a1a2e;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.darkForm :global(.field) {
+  background: #16213e;
+}
+
+.darkForm :global(.label) {
+  color: #0f3460;
+}
+
+.darkForm :global(.description) {
+  color: #94a3b8;
+}
+
+.darkForm input,
+.darkForm textarea,
+.darkForm :global(.ant-input),
+.darkForm :global(.ant-input-number),
+.darkForm :global(.ant-select-selector) {
+  background: #0f3460 !important;
+  color: #e94560 !important;
+  border-color: #533483 !important;
+}

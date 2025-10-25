@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { Radio, Space } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { RadioFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 export function RadioField({
   name,
@@ -76,7 +77,7 @@ export function RadioField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required}
@@ -90,11 +91,7 @@ export function RadioField({
               key={`${name}-${index}`} 
               value={option.value}
               disabled={option.disabled}
-              style={{
-                display: 'block',
-                height: '30px',
-                lineHeight: '30px'
-              }}
+              className={styles.radioOption}
             >
               {option.label}
             </Radio>

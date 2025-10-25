@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { DateFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 // Asegurar que dayjs puede manejar formatos personalizados
 dayjs.extend(customParseFormat)
@@ -31,13 +32,13 @@ export function DateField({
   showTime = false,
   picker = 'date',
   allowClear = true,
-  presentation, // Objeto de presentación que puede contener formato
   ...antdProps
-}: DateFieldProps & { presentation?: any }) {
+}: DateFieldProps) {
+  console.log({ format, picker, label})
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
 
-  const handleChange = useCallback((date: dayjs.Dayjs | null, dateString: string | string[]) => {
+  const handleChange = useCallback((date: dayjs.Dayjs | null) => {
     if (!internalTouched) setInternalTouched(true)
     
     // Enviar el valor como string en formato correcto
@@ -70,8 +71,8 @@ export function DateField({
       if (typeof value === 'string') {
         // Formatos comunes que podemos recibir
         const commonFormats = [
-          'YYYY-MM-DD',     // ISO date
           'DD/MM/YYYY',     // Latam format
+          'YYYY-MM-DD',     // ISO date
           'MM/DD/YYYY',     // US format
           'DD-MM-YYYY',     // European format
           'YYYY/MM/DD',     // Alternative ISO
@@ -83,16 +84,7 @@ export function DateField({
         }
         // Intentar parsear con formatos comunes
         else {
-          // Prioridad 1: Formato desde la presentación
-          const presentationFormat = presentation?.format
-          if (presentationFormat) {
-            parsed = dayjs(value, presentationFormat, true)
-            if (parsed.isValid()) {
-              return parsed
-            }
-          }
-          
-          // Prioridad 2: Formato pasado como prop
+          // Prioridad 1: Formato pasado como prop
           if (format && format !== 'YYYY-MM-DD') {
             parsed = dayjs(value, format, true)
             if (parsed.isValid()) {
@@ -125,7 +117,7 @@ export function DateField({
     } catch {
       return null
     }
-  }, [value, format, presentation])
+  }, [value, format])
 
   // Procesar las fechas mín y máx
   const disabledDate = useCallback((current: any) => {
@@ -153,20 +145,14 @@ export function DateField({
 
   // Determinar el formato de visualización
   const displayFormat = useMemo(() => {
-    // Prioridad 1: Formato desde la presentación x-jsf-presentation
-    const presentationFormat = presentation?.format
-    if (presentationFormat) {
-      return showTime ? `${presentationFormat} HH:mm:ss` : presentationFormat
-    }
-    
-    // Prioridad 2: Formato pasado como prop
+    // Prioridad 1: Formato pasado como prop
     if (format && format !== 'YYYY-MM-DD') {
       return showTime ? `${format} HH:mm:ss` : format
     }
     
     // Formato por defecto
     return showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD'
-  }, [format, showTime, presentation])
+  }, [format, showTime])
 
   if (!isVisible) return null
 
@@ -191,7 +177,7 @@ export function DateField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required} 

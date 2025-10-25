@@ -1,0 +1,22 @@
+.container {
+  /* Contenedor principal del formulario */
+}
+
+.formError {
+  margin-bottom: 16px;
+}
+
+.fieldsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fieldItem {
+  margin-bottom: 0;
+}
+
+.submitContainer {
+  margin-top: 24px;
+  margin-bottom: 0;
+}

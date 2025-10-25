@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { Select } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { SelectFieldProps } from '../../types'
+import styles from './Field.module.css'
 
 // Lista de países (simplificada para el ejemplo)
 const COUNTRIES = [
@@ -121,7 +122,7 @@ export function SelectField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required} 

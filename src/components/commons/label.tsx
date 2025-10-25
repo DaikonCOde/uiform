@@ -1,4 +1,5 @@
 import React from 'react'
+import styles from './label.module.css'
 
 interface FieldLabelProps {
   label?: string
@@ -20,38 +21,20 @@ export function FieldLabel({
   if (!label) return null
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.container} ${className || ''}`} style={style}>
       <label 
         htmlFor={htmlFor}
-        style={{
-          display: 'block',
-          marginBottom: '4px',
-          fontSize: '14px',
-          fontWeight: 500,
-          color: 'rgba(0, 0, 0, 0.85)'
-        }}
+        className={styles.label}
       >
         {label}
         {required && (
-          <span 
-            style={{ 
-              color: '#ff4d4f', 
-              marginLeft: '4px' 
-            }}
-          >
+          <span className={styles.required}>
             *
           </span>
         )}
       </label>
       {description && (
-        <div 
-          style={{
-            fontSize: '12px',
-            color: 'rgba(0, 0, 0, 0.45)',
-            marginBottom: '4px',
-            lineHeight: '1.3'
-          }}
-        >
+        <div className={styles.description}>
           {description}
         </div>
       )}

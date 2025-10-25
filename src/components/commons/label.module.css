@@ -1,0 +1,21 @@
+.container {
+  /* Contenedor del label */
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.required {
+  color: #ff4d4f;
+  margin-left: 4px;
+}
+
+.description {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { Input } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { TextFieldProps } from '../../types'
+import styles from './TextField.module.css'
 
 export function TextField({
   name,
@@ -62,7 +63,7 @@ export function TextField({
   }
 
   return (
-    <div className={className} style={style}>
+    <div className={`${styles.field} ${className || ''}`} style={style}>
       <FieldLabel 
         label={label} 
         required={required} 
