@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import type { Field } from '@remoteoss/json-schema-form'
 import {
   TextField,
@@ -62,61 +62,50 @@ export function useFieldRenderer(options: UseFieldRendererOptions = {}) {
   }), [customComponents])
 
   // Función para renderizar un campo individual
-  const renderField = useMemo(() => {
-    return (field: any, index?: number): React.ReactNode => {
-      const { inputType, name } = field
+  const renderField = useCallback((field: any, index?: number): React.ReactNode => {
+    const { inputType, name } = field
 
-      // Buscar el componente apropiado
-      const FieldComponent = componentMap[inputType as keyof typeof componentMap]
+    // Buscar el componente apropiado
+    const FieldComponent = componentMap[inputType as keyof typeof componentMap]
 
-      if (!FieldComponent) {
-        console.warn(`No component found for field type: ${inputType}`)
-        return (
-          <div key={`${name}-${index || 0}`} style={{ 
-            padding: '8px', 
-            border: '1px dashed #ff4d4f', 
-            borderRadius: '4px',
-            color: '#ff4d4f'
-          }}>
-            Unsupported field type: {inputType}
-            <pre style={{ fontSize: '10px', marginTop: '4px' }}>
-              {JSON.stringify(field, null, 2)}
-            </pre>
-          </div>
-        )
-      }
-
-      // Props base que se pasan a todos los campos
-      const baseProps = {
-        // key: `${name}-${index || 0}`,
-        ...field,
-        // Aplicar configuración global
-        disabled: globalConfig.disabled || field.disabled,
-        size: globalConfig.size || field.size,
-        // Wrappers para callbacks
-        onChange: (fieldName: string, value: any) => {
-          field.onChange?.(fieldName, value)
-          onFieldChange?.(fieldName, value, field)
-        },
-        onBlur: (fieldName: string) => {
-          field.onBlur?.(fieldName)
-          onFieldBlur?.(fieldName, field)
-        }
-      }
-
-      // Props específicos para campos complejos (fieldset y group-array)
-      if (inputType === 'fieldset' || inputType === 'group-array') {
-        return (
-          <FieldComponent
-            {...baseProps}
-            renderField={renderField} // Pasar la función de renderizado recursivamente
-          />
-        )
-      }
-
-      return <FieldComponent {...baseProps} />
+    if (!FieldComponent) {
+      console.warn(`No component found for field type: ${inputType}`)
+      return (
+        <div key={`${name}-${index || 0}`} style={{ 
+          padding: '8px', 
+          border: '1px dashed #ff4d4f', 
+          borderRadius: '4px',
+          color: '#ff4d4f'
+        }}>
+          Unsupported field type: {inputType}
+          <pre style={{ fontSize: '10px', marginTop: '4px' }}>
+            {JSON.stringify(field, null, 2)}
+          </pre>
+        </div>
+      )
     }
-  }, [componentMap, globalConfig, onFieldChange, onFieldBlur])
+
+    // Props base que se pasan a todos los campos
+    const baseProps = {
+      // key: `${name}-${index || 0}`,
+      ...field,
+      // Aplicar configuración global
+      disabled: globalConfig.disabled || field.disabled,  
+      size: globalConfig.size || field.size,
+    }
+
+    // Props específicos para campos complejos (fieldset y group-array)
+    if (inputType === 'fieldset' || inputType === 'group-array') {
+      return (
+        <FieldComponent
+          {...baseProps}
+          renderField={renderField} // Pasar la función de renderizado recursivamente
+        />
+      )
+    }
+
+    return <FieldComponent {...baseProps} />
+  }, [componentMap, globalConfig])
 
   // Función para renderizar múltiples campos
   const renderFields = useMemo(() => {
