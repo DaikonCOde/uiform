@@ -13,18 +13,23 @@ export function generateContainerResponsiveCSS(
   className: string
 ): string {
   if (!containerLayout) return "";
+  const { responsive, columns, gap } = containerLayout;
 
   const responsiveCSS = generateResponsiveCSS(containerLayout);
 
   if (!responsiveCSS) return "";
 
-  let processedCSS = "";
+  // let processedCSS = "";
+  let processedCSS = `.${className} {
+      display: grid;
+      gap: ${gap ?? 16};
+    }`;
 
   // Procesar el CSS para mobile-first
-  if (containerLayout.responsive?.sm) {
+  if (responsive?.sm) {
     // Agregar CSS base para móvil (sin media query)
     processedCSS += `.${className} {
-      grid-template-columns: repeat(${containerLayout.responsive.sm}, 1fr);
+      grid-template-columns: repeat(${responsive.sm}, 1fr);
     }\n`;
   }
 

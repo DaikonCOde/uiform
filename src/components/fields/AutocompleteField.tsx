@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { AutoComplete, Spin } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
+import { useFormContext } from '../../hooks/useFormContext'
 import type { AutocompleteFieldProps } from '../../types'
 import styles from './Field.module.css'
 
@@ -26,53 +27,93 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   asyncOptions,
   ...antdProps
 }: AutocompleteFieldProps) {
+  // Obtener contexto del formulario
+  const { 
+    formValues, 
+    getAsyncOptions, 
+    setAsyncOptions, 
+    isAsyncLoading, 
+    setAsyncLoading,
+    getAsyncError,
+    setAsyncError 
+  } = useFormContext()
+  
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
 
   // Estado local para el texto que se muestra en el input
   const [inputValue, setInputValue] = useState<string>('')
   
-  // Estado para async options
-  const [asyncOptionsState, setAsyncOptionsState] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [asyncError, setAsyncError] = useState<string | null>(null)
-
-  // Determinar si el campo usa async options
+  // Determinar si el campo usa async options y su ID
+  const asyncLoaderId = asyncOptions?.id
   const hasAsyncOptions = useMemo(() => {
-    return !!asyncOptions?.loader
-  }, [asyncOptions])
+    return !!asyncOptions?.loader && !!asyncLoaderId
+  }, [asyncOptions, asyncLoaderId])
+  
+  // Obtener opciones y estado desde el contexto
+  const cachedOptions = asyncLoaderId ? getAsyncOptions(asyncLoaderId) : undefined
+  const loading = asyncLoaderId ? isAsyncLoading(asyncLoaderId) : false
+  const asyncError = asyncLoaderId ? getAsyncError(asyncLoaderId) : null
 
+  // Ref para tracking de carga inicial
+  const hasLoadedRef = useRef(false)
+  const prevDepsRef = useRef<string>('')
+  
+  // Obtener valores de dependencias si existen
+  const dependencies = asyncOptions?.dependencies || []
+  const dependencyValuesStr = JSON.stringify(dependencies.map(dep => formValues[dep]))
+  
   // Cargar opciones async al montar (si no es searchable)
   useEffect(() => {
+    if (!hasAsyncOptions || !asyncLoaderId) return
+    
+    const asyncConfig = asyncOptions
+    if (!asyncConfig?.loader || asyncConfig.searchable) return
+    
+    // Verificar si ya se cargó y las dependencias no cambiaron
+    const depsChanged = prevDepsRef.current !== dependencyValuesStr
+    
+    if (hasLoadedRef.current && !depsChanged) {
+      return // Ya se cargó y no hay cambios en dependencias
+    }
+    
+    // Si hay opciones en cache y no cambiaron las dependencias, no recargar
+    if (cachedOptions && cachedOptions.length > 0 && !depsChanged) {
+      hasLoadedRef.current = true
+      return
+    }
+    
     const loadAsyncOptions = async () => {
-      const asyncConfig = asyncOptions
-      if (!asyncConfig?.loader || asyncConfig.searchable) return
-
-      setLoading(true)
-      setAsyncError(null)
+      if (!asyncConfig.loader) return // Extra safety check
+      
+      setAsyncLoading(asyncLoaderId, true)
+      setAsyncError(asyncLoaderId, null)
       
       try {
-        const result = await asyncConfig.loader({formValues: {}})
-        setAsyncOptionsState(result.options || [])
+        // Pasar el contexto completo al loader
+        const result = await asyncConfig.loader({ formValues, search: '' })
+        setAsyncOptions(asyncLoaderId, result.options || [])
+        hasLoadedRef.current = true
+        prevDepsRef.current = dependencyValuesStr
       } catch (err) {
-        setAsyncError(err instanceof Error ? err.message : 'Failed to load options')
-        setAsyncOptionsState([])
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load options'
+        setAsyncError(asyncLoaderId, errorMsg)
+        setAsyncOptions(asyncLoaderId, [])
       } finally {
-        setLoading(false)
+        setAsyncLoading(asyncLoaderId, false)
       }
     }
 
-    if (hasAsyncOptions) {
-      loadAsyncOptions()
-    }
-  }, [hasAsyncOptions, asyncOptions])
+    loadAsyncOptions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAsyncOptions, asyncLoaderId, dependencyValuesStr])
 
   // Mapa de value -> label para encontrar el label cuando tenemos solo el value
   const valueToLabelMap = useMemo(() => {
     const map = new Map<string, string>()
     
-    if (hasAsyncOptions && asyncOptionsState.length > 0) {
-      asyncOptionsState.forEach((option: any) => {
+    if (hasAsyncOptions && cachedOptions && cachedOptions.length > 0) {
+      cachedOptions.forEach((option: any) => {
         if (typeof option === 'object' && option !== null) {
           map.set(String(option.value), option.label || option.title || String(option.value))
         } else {
@@ -90,7 +131,7 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     }
     
     return map
-  }, [options, hasAsyncOptions, asyncOptionsState])
+  }, [options, hasAsyncOptions, cachedOptions])
 
   // Referencia para saber si estamos escribiendo o si se seleccionó una opción
   const isSelectingRef = useRef(false)
@@ -126,24 +167,27 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     const asyncConfig = asyncOptions
     
     // Si no hay configuración async o no es searchable, no hacer nada
-    if (!asyncConfig?.loader) return
+    if (!asyncConfig?.loader || !asyncLoaderId) return
     
     // Si el searchValue está vacío y no es searchable, no buscar
     if (!searchValue && !asyncConfig.searchable) return
 
-    setLoading(true)
-    setAsyncError(null)
+    setAsyncLoading(asyncLoaderId, true)
+    setAsyncError(asyncLoaderId, null)
     
     try {
-      const result = await asyncConfig.loader({search: searchValue, formValues: {}})
-      setAsyncOptionsState(result.options || [])
+      // Pasar el contexto completo al loader
+      const result = await asyncConfig.loader({ search: searchValue, formValues })
+      setAsyncOptions(asyncLoaderId, result.options || [])
     } catch (err) {
-      setAsyncError(err instanceof Error ? err.message : 'Failed to search options')
-      setAsyncOptionsState([])
+      const errorMsg = err instanceof Error ? err.message : 'Failed to search options'
+      setAsyncError(asyncLoaderId, errorMsg)
+      setAsyncOptions(asyncLoaderId, [])
     } finally {
-      setLoading(false)
+      setAsyncLoading(asyncLoaderId, false)
     }
-  }, [asyncOptions])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asyncOptions, asyncLoaderId, formValues])
   
   // Handler cuando se selecciona una opción
   const handleSelect = useCallback((selectedValue: string, option: any) => {
@@ -180,9 +224,9 @@ export const AutocompleteField = React.memo(function AutocompleteField({
 
   // Determinar las opciones a usar
   const autocompleteOptions = useMemo(() => {
-    // Si tiene async options, usar esas
-    if (hasAsyncOptions && asyncOptionsState.length > 0) {
-      return asyncOptionsState.map((option: any) => {
+    // Si tiene async options, usar las del cache
+    if (hasAsyncOptions && cachedOptions && cachedOptions.length > 0) {
+      return cachedOptions.map((option: any) => {
         if (typeof option === 'object' && option !== null) {
           return {
             label: option.label || option.title || String(option.value),
@@ -216,7 +260,7 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     }
     
     return []
-  }, [options, hasAsyncOptions, asyncOptionsState])
+  }, [options, hasAsyncOptions, cachedOptions])
 
   if (!isVisible) return null
 

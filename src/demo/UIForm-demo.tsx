@@ -7,19 +7,6 @@ const { Title, Text } = Typography;
 
 // Schema más completo para mostrar diferentes tipos de campos
 
-
-const initialValues = {
-  personalInfo: {
-    firstName: 'John',
-    lastName: 'Doe'
-  },
-  preferences: {
-    newsletter: true,
-    contactMethod: 'email'
-  },
-  registrationDate: '2025-10-22'
-};
-
 // Schema con colSpan responsivo
 const responsiveColSpanSchema: JsfObjectSchema = {
   "type": "object",
@@ -92,6 +79,7 @@ const responsiveColSpanSchema: JsfObjectSchema = {
         "inputType": 'select',
         "asyncOptions": { 
           "id": 'countriesLoader',
+          "dependencies":  ["country"]
         },
       },
       "x-jsf-layout": {
@@ -182,14 +170,9 @@ const responsiveColSpanSchema: JsfObjectSchema = {
 
 export default function UIFormDemo() {
   const [submittedData, setSubmittedData] = useState<any>(null);
-  const [formData, setFormData] = useState<any>(null);
-  const [layoutData, setLayoutData] = useState<any>(null);
   const [responsiveData, setResponsiveData] = useState<any>(null);
 
   async function handleSubmit(values: any, errors?: any) {
-    console.log('Submitted values:', values);
-    console.log('Errors:', errors);
-    
     if (!errors || Object.keys(errors).length === 0) {
       setSubmittedData(values);
       // Simular envío async
@@ -229,8 +212,6 @@ export default function UIFormDemo() {
 
       console.log(res)
       return {options: res.data.map((d: any) => ({label: d.username, value: d.id?.toString()}) )}
-
-      return {options: []}
     }
   }
 
@@ -285,39 +266,7 @@ export default function UIFormDemo() {
               {JSON.stringify(responsiveData, null, 2)}
             </pre>
           </Card>
-        )}
-
-        {/* Datos del layout demo */}
-        {layoutData && (
-          <Card title="Basic Layout Data (Live)" size="small">
-            <pre style={{ 
-              background: '#e6f7ff', 
-              padding: '12px', 
-              borderRadius: '4px',
-              fontSize: '12px',
-              overflow: 'auto',
-              maxHeight: '300px'
-            }}>
-              {JSON.stringify(layoutData, null, 2)}
-            </pre>
-          </Card>
-        )}
-
-        {/* Datos en tiempo real */}
-        {formData && (
-          <Card title="Registration Form Data (Live)" size="small">
-            <pre style={{ 
-              background: '#f5f5f5', 
-              padding: '12px', 
-              borderRadius: '4px',
-              fontSize: '12px',
-              overflow: 'auto',
-              maxHeight: '300px'
-            }}>
-              {JSON.stringify(formData, null, 2)}
-            </pre>
-          </Card>
-        )}
+        )}     
 
         {/* Datos enviados */}
         {submittedData && (

@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Select, Spin } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
+import { useFormContext } from '../../hooks/useFormContext'
 import type { SelectFieldProps } from '../../types'
 import styles from './Field.module.css'
 
@@ -29,6 +30,17 @@ export function SelectField({
   asyncOptions,
   ...antdProps
 }: SelectFieldProps) {
+  // Obtener contexto del formulario
+  const { 
+    formValues, 
+    getAsyncOptions, 
+    setAsyncOptions, 
+    isAsyncLoading, 
+    setAsyncLoading,
+    getAsyncError,
+    setAsyncError 
+  } = useFormContext()
+  
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
 
@@ -42,65 +54,97 @@ export function SelectField({
     onBlur?.(name)
   }, [name, onBlur, internalTouched])
 
-  // Estado para async options
-  const [asyncOptionsState, setAsyncOptionsState] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [asyncError, setAsyncError] = useState<string | null>(null)
-
-  // Determinar si el campo usa async options
+  // Determinar si el campo usa async options y su ID
+  const asyncLoaderId = asyncOptions?.id
   const hasAsyncOptions = useMemo(() => {
-    return !!asyncOptions?.loader
-  }, [asyncOptions])
+    return !!asyncOptions?.loader && !!asyncLoaderId
+  }, [asyncOptions, asyncLoaderId])
+  
+  // Obtener opciones y estado desde el contexto
+  const cachedOptions = asyncLoaderId ? getAsyncOptions(asyncLoaderId) : undefined
+  const loading = asyncLoaderId ? isAsyncLoading(asyncLoaderId) : false
+  const asyncError = asyncLoaderId ? getAsyncError(asyncLoaderId) : null
 
+  // Ref para tracking de carga inicial
+  const hasLoadedRef = useRef(false)
+  const prevDepsRef = useRef<string>('')
+  
+  // Obtener valores de dependencias si existen
+  const dependencies = asyncOptions?.dependencies || []
+  const dependencyValuesStr = JSON.stringify(dependencies.map(dep => formValues[dep]))
+  
   // Cargar opciones async al montar o cuando cambien las dependencias
   useEffect(() => {
+    if (!hasAsyncOptions || !asyncLoaderId) return
+    
+    const asyncConfig = asyncOptions
+    if (!asyncConfig?.loader) return
+    
+    // Verificar si ya se cargó y las dependencias no cambiaron
+    const depsChanged = prevDepsRef.current !== dependencyValuesStr
+    
+    if (hasLoadedRef.current && !depsChanged && !asyncConfig.searchable) {
+      return // Ya se cargó y no hay cambios en dependencias
+    }
+    
+    // Si hay opciones en cache y no cambiaron las dependencias, no recargar
+    if (cachedOptions && cachedOptions.length > 0 && !depsChanged && !asyncConfig.searchable) {
+      hasLoadedRef.current = true
+      return
+    }
+    
     const loadAsyncOptions = async () => {
-      const asyncConfig = asyncOptions
-      if (!asyncConfig?.loader) return
-
-      setLoading(true)
-      setAsyncError(null)
+      if (!asyncConfig.loader) return // Extra safety check
+      
+      setAsyncLoading(asyncLoaderId, true)
+      setAsyncError(asyncLoaderId, null)
       
       try {
-        const result = await asyncConfig.loader({formValues: {}})
-        setAsyncOptionsState(result.options || [])
+        // Pasar el contexto completo al loader
+        const result = await asyncConfig.loader({ formValues, search: '' })
+        setAsyncOptions(asyncLoaderId, result.options || [])
+        hasLoadedRef.current = true
+        prevDepsRef.current = dependencyValuesStr
       } catch (err) {
-        setAsyncError(err instanceof Error ? err.message : 'Failed to load options')
-        setAsyncOptionsState([])
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load options'
+        setAsyncError(asyncLoaderId, errorMsg)
+        setAsyncOptions(asyncLoaderId, [])
       } finally {
-        setLoading(false)
+        setAsyncLoading(asyncLoaderId, false)
       }
     }
 
-    if (hasAsyncOptions) {
-      loadAsyncOptions()
-    }
-  }, [hasAsyncOptions, asyncOptions])
+    loadAsyncOptions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAsyncOptions, asyncLoaderId, dependencyValuesStr])
 
   // Handler para búsqueda en async options
   const handleSearch = useCallback(async (searchValue: string) => {
     const asyncConfig = asyncOptions
-    if (!asyncConfig?.loader || !asyncConfig.searchable) return
+    if (!asyncConfig?.loader || !asyncConfig.searchable || !asyncLoaderId) return
 
-    setLoading(true)
-    setAsyncError(null)
+    setAsyncLoading(asyncLoaderId, true)
+    setAsyncError(asyncLoaderId, null)
     
     try {
-      const result = await asyncConfig.loader({search: searchValue, formValues: {}})
-      setAsyncOptionsState(result.options || [])
+      // Pasar el contexto completo al loader
+      const result = await asyncConfig.loader({ search: searchValue, formValues })
+      setAsyncOptions(asyncLoaderId, result.options || [])
     } catch (err) {
-      setAsyncError(err instanceof Error ? err.message : 'Failed to search options')
-      setAsyncOptionsState([])
+      const errorMsg = err instanceof Error ? err.message : 'Failed to search options'
+      setAsyncError(asyncLoaderId, errorMsg)
+      setAsyncOptions(asyncLoaderId, [])
     } finally {
-      setLoading(false)
+      setAsyncLoading(asyncLoaderId, false)
     }
-  }, [asyncOptions])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asyncOptions, asyncLoaderId, formValues])
 
   // Determinar las opciones a usar
   const selectOptions = useMemo(() => {
-    // Si tiene async options, usar esas
-    if (hasAsyncOptions && asyncOptionsState.length > 0) {
-      return asyncOptionsState.map((option: any) => {
+    // Si tiene async options, usar las del cache
+    if (hasAsyncOptions && cachedOptions && cachedOptions.length > 0) {
+      return cachedOptions.map((option: any) => {
         if (typeof option === 'object' && option !== null) {
           return {
             label: option.label || option.title || String(option.value),
@@ -134,7 +178,7 @@ export function SelectField({
     }
     
     return []
-  }, [options, hasAsyncOptions, asyncOptionsState])
+  }, [options, hasAsyncOptions, cachedOptions])
 
   const defaultFilterOption = useCallback((input: string, option?: any) => {
     const label = option?.label || ''

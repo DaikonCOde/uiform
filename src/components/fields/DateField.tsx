@@ -34,7 +34,6 @@ export function DateField({
   allowClear = true,
   ...antdProps
 }: DateFieldProps) {
-  console.log({ format, picker, label})
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
 

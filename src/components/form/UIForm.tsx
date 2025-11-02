@@ -8,10 +8,13 @@ import { Form, Button, Space, Alert } from 'antd'
 import { useFieldRenderer } from '../../hooks/useFieldRenderer'
 import { formValuesToJsonValues, getDefaultValuesFromFields } from '../../utils/utils'
 import { useResponsiveCSS } from '../../utils/responsive-layout'
+import { FormProvider } from '../../context/FormContext'
+import { useFormContext } from '../../hooks/useFormContext'
 import type { UIFormProps } from '../../types'
 import styles from './UIForm.module.css'
 
-export function UIForm({
+// Componente interno que usa el contexto
+function UIFormContent({
   schema,
   initialValues = {},
   asyncLoaders = {},
@@ -25,6 +28,8 @@ export function UIForm({
 }: UIFormProps & {
   children?: React.ReactNode
 }) {
+  // Obtener contexto del formulario
+  const { setFormValues: setContextFormValues } = useFormContext()
   const {
     showRequiredMark = true,
     validateTrigger = 'onChange',
@@ -73,13 +78,6 @@ export function UIForm({
   )
 
   // Generar estilos CSS para el layout del contenedor
-  const containerStyle = useMemo(() => {
-    if (containerLayout) {
-      return generateCSSGridProperties(containerLayout)
-    }
-    // Estilo por defecto si no hay layout definido
-    return { display: 'flex', flexDirection: 'column' as const, gap: '16px' }
-  }, [containerLayout])
 
   // Hook para renderizar campos
   const { renderField } = useFieldRenderer({
@@ -121,6 +119,9 @@ export function UIForm({
         [fieldName]: value
       }
       
+      // Actualizar contexto con los nuevos valores
+      setContextFormValues(newValues)
+      
       // Validar según la configuración
       if (validateTrigger === 'onChange') {
         // Usar setTimeout para asegurar que la validación ocurre después del render
@@ -133,7 +134,7 @@ export function UIForm({
       
       return newValues
     })
-  }, [validateTrigger, validateValues, onChange])
+  }, [validateTrigger, validateValues, onChange, setContextFormValues])
 
   // Manejar blur de campo
   const handleFieldBlur = useCallback((_fieldName: string) => {
@@ -169,13 +170,21 @@ export function UIForm({
     }
   }, [values, validateValues, onSubmit])
 
-  // Actualizar valores cuando cambian los initialValues
+  // Sincronizar valores iniciales con el contexto
+  useEffect(() => {
+    const newValues = getDefaultValuesFromFields(fields, initialValues)
+    setValues(newValues)
+    setContextFormValues(newValues)
+  }, []) // Solo al montar
+  
+  // Actualizar cuando cambian initialValues (después del montaje inicial)
   useEffect(() => {
     if (Object.keys(initialValues).length > 0) {
       const newValues = getDefaultValuesFromFields(fields, initialValues)
       setValues(newValues)
+      setContextFormValues(newValues)
     }
-  }, [initialValues, fields])
+  }, [initialValues, fields, setContextFormValues])
 
   // Si hay error en la inicialización, mostrar mensaje
   if (isError) {
@@ -213,7 +222,6 @@ export function UIForm({
 
         {/* Renderizar campos con layout */}
         <div 
-          style={containerStyle}
           className={containerClassName}
         >
           {fields.map((field, index) => {
@@ -227,14 +235,11 @@ export function UIForm({
             }
 
             // Obtener layout específico del campo
-            const fieldLayout = getFieldLayoutInfo(field)
-            const fieldStyle = fieldLayout ? generateCSSGridProperties(fieldLayout) : {}
             const fieldClassName = getFieldClassName(field.name)
 
             return (
               <Form.Item 
                 key={field.name} 
-                style={fieldStyle}
                 className={`${styles.fieldItem} ${fieldClassName}`}
               >
                 {renderField(fieldWithProps, index)}
@@ -260,6 +265,7 @@ export function UIForm({
                 onClick={() => {
                   const resetValues = getDefaultValuesFromFields(fields, {})
                   setValues(resetValues)
+                  setContextFormValues(resetValues)
                   setErrors({})
                   setSubmitted(false)
                 }}
@@ -279,6 +285,15 @@ export function UIForm({
         )}
       </Form>
     </div>
+  )
+}
+
+// Componente exportado que envuelve con FormProvider
+export function UIForm(props: UIFormProps & { children?: React.ReactNode }) {
+  return (
+    <FormProvider initialValues={props.initialValues}>
+      <UIFormContent {...props} />
+    </FormProvider>
   )
 }
 
