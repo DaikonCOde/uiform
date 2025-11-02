@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, Space, Typography, Divider } from 'antd';
 import { UIForm } from "../components/form/UIForm";
-import type { JsfObjectSchema } from "@remoteoss/json-schema-form";
+import type { AsyncOptionsLoader, JsfObjectSchema } from "@remoteoss/json-schema-form";
 
 const { Title, Text } = Typography;
 
@@ -40,9 +40,9 @@ const responsiveColSpanSchema: JsfObjectSchema = {
       "type": "string",
       "x-jsf-layout": {
         "colSpan": {
-          "sm": 1,
-          "md": 2,
-          "lg": 4 
+          "sm": 2,
+          "md": 1,
+          "lg": 4
         }
       },
       "x-jsf-presentation": {
@@ -65,6 +65,53 @@ const responsiveColSpanSchema: JsfObjectSchema = {
           "lg": 2 
         }
       }
+    },
+    "country": {
+      "title": "País",
+      "type": 'number',
+      'x-jsf-presentation': {
+        "inputType": 'select',
+        "options": [
+          { "label": "USA", "value": 1 },
+          { "label": "Canada", "value": 2 },
+          { "label": "Mexico", "value": 3 }
+        ]
+      },
+      "x-jsf-layout": {
+        "colSpan": {
+          "sm": 1,
+          "md": 2,
+          "lg": 4
+        }
+      },
+    },
+    "state": {
+      "title": "Área Geográfica",
+      "type": 'number',
+      'x-jsf-presentation': {
+        "inputType": 'select',
+        "asyncOptions": { 
+          "id": 'countriesLoader',
+        },
+      },
+      "x-jsf-layout": {
+        "colSpan": {
+          "sm": 1,
+          "md": 2,
+          "lg": 1
+        }
+      },
+    },
+    "country_search": {
+      "type": 'string',
+      "title": "Search country",
+      'x-jsf-presentation': {
+        "inputType": 'autocomplete',
+        "asyncOptions": { 
+          "id": 'searchCountry',
+          "searchable": true // Para búsqueda dinámica
+        },
+      },
     },
     "lastName": {
       "title": "Last Name",
@@ -151,19 +198,40 @@ export default function UIFormDemo() {
     }
   }
 
-  function handleChange(values: any, errors?: any) {
-    setFormData(values);
-    console.log('Form changed:', { values, errors });
-  }
-
-  function handleLayoutChange(values: any, errors?: any) {
-    setLayoutData(values);
-    console.log('Layout form changed:', { values, errors });
-  }
-
   function handleResponsiveChange(values: any, errors?: any) {
     setResponsiveData(values);
     console.log('Responsive form changed:', { values, errors });
+  }
+  const asyncLoader: Record<string, AsyncOptionsLoader> = {
+    countriesLoader: async (context) => {
+      console.log({context})
+
+      const { formValues } = context
+      const countryCode = formValues.country
+
+      console.log({countryCode, formValues})
+      if (!countryCode) {
+        return { options: [] }
+      }
+        const req = await fetch('https://fakeapi.net/users')
+        const res = await req.json()
+
+        console.log(res)
+        return {options: res.data.map((d: any) => ({label: d.username, value: d.id}) )}
+    },
+    searchCountry: async (context) => {
+      const { formValues, search } = context
+
+      console.log({search, formValues})
+
+      const req = await fetch(`https://fakeapi.net/users`)
+      const res = await req.json()
+
+      console.log(res)
+      return {options: res.data.map((d: any) => ({label: d.username, value: d.id?.toString()}) )}
+
+      return {options: []}
+    }
   }
 
   return (
@@ -191,6 +259,7 @@ export default function UIFormDemo() {
             initialValues={{}}
             onSubmit={handleSubmit}
             onChange={handleResponsiveChange}
+            asyncLoaders={asyncLoader}
             config={{
               layout: 'vertical',
               size: 'middle',

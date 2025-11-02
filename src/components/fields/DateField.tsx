@@ -168,6 +168,7 @@ export function DateField({
     picker,
     allowClear,
     disabledDate,
+    getPopupContainer: (trigger: any) => trigger.parentElement,
     status: error && (isTouched || submitted) ? ("error" as "" | "error" | "warning") : undefined,
     'aria-invalid': !!error,
     'aria-describedby': error ? `${name}-error` : undefined,

@@ -7,7 +7,8 @@ import type {
   RadioGroupProps, 
   DatePickerProps,
   UploadProps,
-  InputNumberProps
+  InputNumberProps,
+  AutoCompleteProps
 } from "antd"
 import type { TextAreaProps } from "antd/es/input"
 
@@ -40,6 +41,10 @@ export interface TextareaFieldProps extends BaseFieldProps, Omit<TextAreaProps, 
 export interface SelectFieldProps extends BaseFieldProps, Omit<SelectProps, 'onChange' | 'value' | 'options'> {
   inputType: 'select' | 'country'
   multiple?: boolean
+}
+
+export interface AutocompleteFieldProps extends BaseFieldProps, Omit<AutoCompleteProps, 'onChange' | 'value' | 'options'> {
+  inputType: 'autocomplete'
 }
 
 export interface RadioFieldProps extends BaseFieldProps, Omit<RadioGroupProps, 'onChange' | 'value' | 'options'> {
@@ -81,6 +86,7 @@ export type FieldProps =
   | NumberFieldProps 
   | TextareaFieldProps
   | SelectFieldProps 
+  | AutocompleteFieldProps
   | RadioFieldProps 
   | CheckboxFieldProps 
   | DateFieldProps 
@@ -105,10 +111,14 @@ export interface UIFormConfig {
   disabled?: boolean
 }
 
+// Tipo para async loaders
+export type AsyncOptionsLoader = (context: any) => Promise<{ options: any[] }>
+
 // Props del componente principal JForm
 export interface UIFormProps {
   schema: any // JsfObjectSchema from json-schema-form
   initialValues?: Record<string, any>
+  asyncLoaders?: Record<string, AsyncOptionsLoader> // Mapeador de funciones async
   onSubmit?: (values: any, errors?: any) => void | Promise<void>
   onChange?: (values: any, errors?: any) => void
   config?: UIFormConfig

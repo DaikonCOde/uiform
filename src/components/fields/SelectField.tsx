@@ -1,34 +1,8 @@
-import { useState, useCallback, useMemo } from 'react'
-import { Select } from 'antd'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { Select, Spin } from 'antd'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { SelectFieldProps } from '../../types'
 import styles from './Field.module.css'
-
-// Lista de países (simplificada para el ejemplo)
-const COUNTRIES = [
-  { label: 'Afghanistan', value: 'AF' },
-  { label: 'Albania', value: 'AL' },
-  { label: 'Algeria', value: 'DZ' },
-  { label: 'Argentina', value: 'AR' },
-  { label: 'Australia', value: 'AU' },
-  { label: 'Austria', value: 'AT' },
-  { label: 'Brazil', value: 'BR' },
-  { label: 'Canada', value: 'CA' },
-  { label: 'Chile', value: 'CL' },
-  { label: 'China', value: 'CN' },
-  { label: 'Colombia', value: 'CO' },
-  { label: 'France', value: 'FR' },
-  { label: 'Germany', value: 'DE' },
-  { label: 'India', value: 'IN' },
-  { label: 'Italy', value: 'IT' },
-  { label: 'Japan', value: 'JP' },
-  { label: 'Mexico', value: 'MX' },
-  { label: 'Peru', value: 'PE' },
-  { label: 'Spain', value: 'ES' },
-  { label: 'United Kingdom', value: 'GB' },
-  { label: 'United States', value: 'US' },
-  { label: 'Venezuela', value: 'VE' },
-]
 
 export function SelectField({
   name,
@@ -50,8 +24,9 @@ export function SelectField({
   multiple,
   options,
   allowClear = true,
-  showSearch = true,
+  showSearch = false,
   filterOption,
+  asyncOptions,
   ...antdProps
 }: SelectFieldProps) {
   const [internalTouched, setInternalTouched] = useState(false)
@@ -67,10 +42,78 @@ export function SelectField({
     onBlur?.(name)
   }, [name, onBlur, internalTouched])
 
+  // Estado para async options
+  const [asyncOptionsState, setAsyncOptionsState] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [asyncError, setAsyncError] = useState<string | null>(null)
+
+  // Determinar si el campo usa async options
+  const hasAsyncOptions = useMemo(() => {
+    return !!asyncOptions?.loader
+  }, [asyncOptions])
+
+  // Cargar opciones async al montar o cuando cambien las dependencias
+  useEffect(() => {
+    const loadAsyncOptions = async () => {
+      const asyncConfig = asyncOptions
+      if (!asyncConfig?.loader) return
+
+      setLoading(true)
+      setAsyncError(null)
+      
+      try {
+        const result = await asyncConfig.loader({formValues: {}})
+        setAsyncOptionsState(result.options || [])
+      } catch (err) {
+        setAsyncError(err instanceof Error ? err.message : 'Failed to load options')
+        setAsyncOptionsState([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (hasAsyncOptions) {
+      loadAsyncOptions()
+    }
+  }, [hasAsyncOptions, asyncOptions])
+
+  // Handler para búsqueda en async options
+  const handleSearch = useCallback(async (searchValue: string) => {
+    const asyncConfig = asyncOptions
+    if (!asyncConfig?.loader || !asyncConfig.searchable) return
+
+    setLoading(true)
+    setAsyncError(null)
+    
+    try {
+      const result = await asyncConfig.loader({search: searchValue, formValues: {}})
+      setAsyncOptionsState(result.options || [])
+    } catch (err) {
+      setAsyncError(err instanceof Error ? err.message : 'Failed to search options')
+      setAsyncOptionsState([])
+    } finally {
+      setLoading(false)
+    }
+  }, [asyncOptions])
+
   // Determinar las opciones a usar
   const selectOptions = useMemo(() => {
-    if (inputType === 'country') {
-      return COUNTRIES
+    // Si tiene async options, usar esas
+    if (hasAsyncOptions && asyncOptionsState.length > 0) {
+      return asyncOptionsState.map((option: any) => {
+        if (typeof option === 'object' && option !== null) {
+          return {
+            label: option.label || option.title || String(option.value),
+            value: option.value,
+            disabled: option.disabled,
+            ...option
+          }
+        }
+        return {
+          label: String(option),
+          value: option
+        }
+      })
     }
     
     if (options && Array.isArray(options)) {
@@ -91,7 +134,7 @@ export function SelectField({
     }
     
     return []
-  }, [inputType, options])
+  }, [options, hasAsyncOptions, asyncOptionsState])
 
   const defaultFilterOption = useCallback((input: string, option?: any) => {
     const label = option?.label || ''
@@ -100,6 +143,13 @@ export function SelectField({
 
   if (!isVisible) return null
 
+  const asyncConfig = asyncOptions
+  const isSearchable = hasAsyncOptions ? asyncConfig?.searchable : showSearch
+
+
+  
+  const {jsonType, _rootLayout, errorMessage, ...filteredAntdProps} = antdProps
+
 
   const selectProps = {
     id: name,
@@ -107,18 +157,22 @@ export function SelectField({
     onChange: handleChange,
     onBlur: handleBlur,
     placeholder: placeholder || `Select ${inputType === 'country' ? 'country' : 'option'}...`,
-    disabled,
+    disabled: disabled || loading,
     mode: multiple ? "multiple" as const : undefined,
     allowClear,
-    showSearch,
-    filterOption: filterOption || defaultFilterOption,
+    showSearch: isSearchable,
+    filterOption: hasAsyncOptions && asyncConfig?.searchable ? false : (filterOption || defaultFilterOption),
+    onSearch: hasAsyncOptions && asyncConfig?.searchable ? handleSearch : undefined,
+    loading,
+    notFoundContent: loading ? <Spin size="small" /> : (asyncError ? asyncError : undefined),
     options: selectOptions,
-    status: error && (isTouched || submitted) ? ("error" as "" | "error" | "warning") : undefined,
-    'aria-invalid': !!error,
-    'aria-describedby': error ? `${name}-error` : undefined,
+    getPopupContainer: (trigger: any) => trigger.parentElement,
+    status: (error || asyncError) && (isTouched || submitted) ? ("error" as "" | "error" | "warning") : undefined,
+    'aria-invalid': !!(error || asyncError),
+    'aria-describedby': (error || asyncError) ? `${name}-error` : undefined,
     'aria-required': required,
     style: { width: '100%' },
-    ...antdProps
+    ...filteredAntdProps
   }
 
   return (
@@ -133,7 +187,7 @@ export function SelectField({
       <Select {...selectProps} />
       
       {(isTouched || submitted) && (
-        <ErrorMessage error={error} fieldName={name} />
+        <ErrorMessage error={error || asyncError} fieldName={name} />
       )}
     </div>
   )

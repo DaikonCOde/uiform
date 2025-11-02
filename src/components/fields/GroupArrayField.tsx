@@ -102,9 +102,11 @@ export function GroupArrayField({
           </div>
         ) : (
           <Space direction="vertical" style={{ width: '100%' }}>
-            {arrayValue.map((item, index) => (
+            {arrayValue.map((item, index) => {
+              const itemKey = item.id || item._id || `${name}-${index}`
+              return (
               <Card
-                key={`${name}-item-${index}`}
+                key={itemKey}
                 size="small"
                 style={{
                   ...(error && Array.isArray(error) && error[index] && (isTouched || submitted) ? 
@@ -169,7 +171,7 @@ export function GroupArrayField({
                     }
                     
                     return renderField ? renderField(nestedField, fieldIndex) : (
-                      <div key={`${name}-${index}-${field.name}-${fieldIndex}`}>
+                      <div key={`${name}-${index}-${field.name}`}>
                         <pre style={{ fontSize: '10px' }}>{JSON.stringify(nestedField, null, 1)}</pre>
                       </div>
                     )
@@ -184,7 +186,8 @@ export function GroupArrayField({
                   </div>
                 )}
               </Card>
-            ))}
+            )})
+            }
           </Space>
         )}
         

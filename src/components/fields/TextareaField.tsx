@@ -44,6 +44,8 @@ export function TextareaField({
 
   if (!isVisible) return null
 
+  const {jsonType, _rootLayout, ...filteredAntdProps} = antdProps
+
   const textareaProps = {
     id: name,
     value: value || '',
@@ -59,7 +61,7 @@ export function TextareaField({
     'aria-invalid': !!error,
     'aria-describedby': error ? `${name}-error` : undefined,
     'aria-required': required,
-    ...antdProps
+    ...filteredAntdProps
   }
 
   return (

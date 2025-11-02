@@ -86,9 +86,9 @@ export function RadioField({
       
       <Radio.Group {...radioProps}>
         <Space direction="vertical">
-          {radioOptions.map((option, index) => (
+          {radioOptions.map((option) => (
             <Radio 
-              key={`${name}-${index}`} 
+              key={`${name}-${option.value}`} 
               value={option.value}
               disabled={option.disabled}
               className={styles.radioOption}

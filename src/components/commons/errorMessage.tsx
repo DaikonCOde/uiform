@@ -1,7 +1,7 @@
 import styles from './errorMessage.module.css'
 
 interface ErrorMessageProps {
-  error?: string | Record<string, any>
+  error?: string | Record<string, any> | null
   fieldName?: string
 }
 
@@ -26,7 +26,7 @@ export function ErrorMessage({ error, fieldName }: ErrorMessageProps) {
       <div className={styles.errorContainer}>
         {errorMessages.map((msg, index) => (
           <div 
-            key={`${fieldName}-error-${index}`}
+            key={`${fieldName || 'error'}-${index}`}
             className={`${styles.errorItem} ${index > 0 ? styles.errorItemSpaced : ''}`}
           >
             {typeof msg === 'string' ? msg : JSON.stringify(msg)}

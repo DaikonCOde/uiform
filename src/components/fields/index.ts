@@ -3,6 +3,7 @@ export { TextField } from './TextField'
 export { NumberField } from './NumberField'
 export { TextareaField } from './TextareaField'
 export { SelectField } from './SelectField'
+export { AutocompleteField } from './AutocompleteField'
 export { RadioField } from './RadioField'
 export { CheckboxField } from './CheckboxField'
 export { DateField } from './DateField'
@@ -16,6 +17,7 @@ export type {
   NumberFieldProps,
   TextareaFieldProps,
   SelectFieldProps,
+  AutocompleteFieldProps,
   RadioFieldProps,
   CheckboxFieldProps,
   DateFieldProps,

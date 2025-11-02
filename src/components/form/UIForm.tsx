@@ -14,6 +14,7 @@ import styles from './UIForm.module.css'
 export function UIForm({
   schema,
   initialValues = {},
+  asyncLoaders = {},
   onSubmit,
   onChange,
   config = {},
@@ -38,6 +39,7 @@ export function UIForm({
       return createHeadlessForm(schema, {
         strictInputType: false,
         initialValues,
+        asyncLoaders,
       })
     } catch (err) {
       console.error('Error creating headless form:', err)
@@ -49,7 +51,7 @@ export function UIForm({
         layout: null
       }
     }
-  }, [schema, initialValues])
+  }, [schema, initialValues, asyncLoaders])
 
   // Estados del formulario
   const [values, setValues] = useState<Record<string, any>>(() =>
@@ -113,19 +115,25 @@ export function UIForm({
 
   // Manejar cambios de campo
   const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    const newValues = {
-      ...values,
-      [fieldName]: value
-    }
-    setValues(newValues)
-
-    // Validar según la configuración
-    if (validateTrigger === 'onChange') {
-      const validation = validateValues(newValues)
-      // Llamar onChange si está definido
-      onChange?.(validation.jsonValues, validation.errors)
-    }
-  }, [values, validateTrigger, validateValues, onChange])
+    setValues((prevValues) => {
+      const newValues = {
+        ...prevValues,
+        [fieldName]: value
+      }
+      
+      // Validar según la configuración
+      if (validateTrigger === 'onChange') {
+        // Usar setTimeout para asegurar que la validación ocurre después del render
+        setTimeout(() => {
+          const validation = validateValues(newValues)
+          // Llamar onChange si está definido
+          onChange?.(validation.jsonValues, validation.errors)
+        }, 0)
+      }
+      
+      return newValues
+    })
+  }, [validateTrigger, validateValues, onChange])
 
   // Manejar blur de campo
   const handleFieldBlur = useCallback((_fieldName: string) => {
@@ -225,7 +233,7 @@ export function UIForm({
 
             return (
               <Form.Item 
-                key={`${field.name}-${index}`} 
+                key={field.name} 
                 style={fieldStyle}
                 className={`${styles.fieldItem} ${fieldClassName}`}
               >

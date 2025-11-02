@@ -1,5 +1,6 @@
 .field {
   /* Contenedor base de campo */
+  text-align: left;
 }
 
 .checkboxDescription {

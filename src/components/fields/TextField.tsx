@@ -44,7 +44,7 @@ export function TextField({
     return <input type="hidden" name={name} value={value || ''} />
   }
 
-  const {type, ...filteredAntdProps} = antdProps
+  const {type, jsonType, _rootLayout, errorMessage, ...filteredAntdProps} = antdProps
 
   const inputProps = {
     id: name,

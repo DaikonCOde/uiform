@@ -86,7 +86,7 @@ export function FieldsetField({
             }
             
             return renderField ? renderField(nestedField, index) : (
-              <div key={`${name}-${field.name}-${index}`}>
+              <div key={`${name}-${field.name}`}>
                 <pre>{JSON.stringify(nestedField, null, 2)}</pre>
               </div>
             )

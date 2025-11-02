@@ -5,6 +5,7 @@ import {
   NumberField,
   TextareaField,
   SelectField,
+  AutocompleteField,
   RadioField,
   CheckboxField,
   DateField,
@@ -22,6 +23,7 @@ const FIELD_COMPONENT_MAP = {
   money: NumberField,
   textarea: TextareaField,
   select: SelectField,
+  autocomplete: AutocompleteField,
   country: SelectField,
   radio: RadioField,
   checkbox: CheckboxField,
@@ -86,7 +88,7 @@ export function useFieldRenderer(options: UseFieldRendererOptions = {}) {
 
       // Props base que se pasan a todos los campos
       const baseProps = {
-        key: `${name}-${index || 0}`,
+        // key: `${name}-${index || 0}`,
         ...field,
         // Aplicar configuración global
         disabled: globalConfig.disabled || field.disabled,
