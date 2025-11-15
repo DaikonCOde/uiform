@@ -11,6 +11,72 @@ import { useFormContext } from "../../hooks/useFormContext";
 import type { AutocompleteFieldProps } from "../../types";
 import styles from "./Field.module.css";
 
+// Wrapper interno que mantiene el input estable
+const StableAutocomplete = React.memo(({ 
+  inputValue,
+  onInputChange,
+  onSelectOption,
+  onBlurHandler,
+  onSearchHandler,
+  autocompleteOptions,
+  isSearchable,
+  placeholder,
+  disabled,
+  loading,
+  allowClear,
+  error,
+  asyncError,
+  isTouched,
+  submitted,
+  required,
+  name,
+  filteredAntdProps
+}: any) => {
+  const inputRef = useRef<any>(null);
+  
+  return (
+    <AutoComplete
+      ref={inputRef}
+      key={`autocomplete-${name}`}
+      id={name}
+      value={inputValue}
+      onChange={onInputChange}
+      onSelect={onSelectOption}
+      onBlur={onBlurHandler}
+      onSearch={isSearchable ? onSearchHandler : undefined}
+      placeholder={placeholder || `Search...`}
+      disabled={disabled || loading}
+      allowClear={allowClear}
+      options={autocompleteOptions}
+      filterOption={false}
+      getPopupContainer={(trigger: any) => trigger.parentElement}
+      status={
+        (error || asyncError) && (isTouched || submitted)
+          ? ("error" as "" | "error" | "warning")
+          : undefined
+      }
+      notFoundContent={
+        loading ? <Spin size="small" /> : asyncError ? asyncError : "No results"
+      }
+      aria-invalid={!!(error || asyncError)}
+      aria-describedby={error || asyncError ? `${name}-error` : undefined}
+      aria-required={required}
+      style={{ width: "100%" }}
+      {...filteredAntdProps}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Comparar solo props que realmente deben causar re-render
+  return (
+    prevProps.inputValue === nextProps.inputValue &&
+    prevProps.disabled === nextProps.disabled &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.error === nextProps.error &&
+    prevProps.asyncError === nextProps.asyncError &&
+    JSON.stringify(prevProps.autocompleteOptions) === JSON.stringify(nextProps.autocompleteOptions)
+  );
+});
+
 export const AutocompleteField = React.memo(function AutocompleteField({
   name,
   label,
@@ -33,7 +99,6 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   asyncOptions,
   ...antdProps
 }: AutocompleteFieldProps) {
-  // Obtener contexto del formulario
   const {
     formValues,
     getAsyncOptions,
@@ -317,34 +382,25 @@ export const AutocompleteField = React.memo(function AutocompleteField({
         description={description}
       />
 
-      <AutoComplete
-        key={`autocomplete-${name}`}
-        ref={inputRef}
-        id={name}
-        value={inputValue}
-        onChange={handleChange}
-        onSelect={handleSelect}
-        onBlur={handleBlur}
-        onSearch={isSearchable ? handleSearch : undefined}
-        placeholder={placeholder || `Search...`}
-        disabled={disabled || loading}
+      <StableAutocomplete
+        inputValue={inputValue}
+        onInputChange={handleChange}
+        onSelectOption={handleSelect}
+        onBlurHandler={handleBlur}
+        onSearchHandler={handleSearch}
+        autocompleteOptions={autocompleteOptions}
+        isSearchable={isSearchable}
+        placeholder={placeholder}
+        disabled={disabled}
+        loading={loading}
         allowClear={allowClear}
-        options={autocompleteOptions}
-        filterOption={false}
-        getPopupContainer={(trigger: any) => trigger.parentElement}
-        status={
-          (error || asyncError) && (isTouched || submitted)
-            ? ("error" as "" | "error" | "warning")
-            : undefined
-        }
-        notFoundContent={
-          loading ? <Spin size="small" /> : asyncError ? asyncError : "No results"
-        }
-        aria-invalid={!!(error || asyncError)}
-        aria-describedby={error || asyncError ? `${name}-error` : undefined}
-        aria-required={required}
-        style={{ width: "100%" }}
-        {...filteredAntdProps}
+        error={error}
+        asyncError={asyncError}
+        isTouched={isTouched}
+        submitted={submitted}
+        required={required}
+        name={name}
+        filteredAntdProps={filteredAntdProps}
       />
 
       {(isTouched || submitted) && (

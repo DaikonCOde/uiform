@@ -1,8 +1,6 @@
 import React from "react";
 import {
-  generateResponsiveCSS,
   getFieldLayoutInfo,
-  generateResponsiveFieldCSS,
 } from "@remoteoss/json-schema-form";
 
 /**
@@ -15,43 +13,53 @@ export function generateContainerResponsiveCSS(
   if (!containerLayout) return "";
   const { responsive, columns, gap } = containerLayout;
 
-  const responsiveCSS = generateResponsiveCSS(containerLayout);
+  let css = "";
 
-  if (!responsiveCSS) return "";
+  // Base styles (always applied)
+  css += `.${className} {
+  display: grid;
+  gap: ${gap ?? "16px"};
+`;
 
-  // let processedCSS = "";
-  let processedCSS = `.${className} {
-      display: grid;
-      gap: ${gap ?? 16};
-    }`;
-
-  // Procesar el CSS para mobile-first
-  if (responsive?.sm) {
-    // Agregar CSS base para móvil (sin media query)
-    processedCSS += `.${className} {
-      grid-template-columns: repeat(${responsive.sm}, 1fr);
-    }\n`;
+  // If no responsive config, use the columns value
+  if (!responsive) {
+    css += `  grid-template-columns: repeat(${columns || 1}, 1fr);\n}\n`;
+    return css;
   }
 
-  // Aplicar media queries para otros breakpoints
-  const mediaQueryCSS = responsiveCSS.replace(
-    /(@media[^{]+)\{([^}]*)\}/g,
-    (match, mediaQuery, rules) => {
-      // Solo agregar media queries que NO sean para sm (móvil)
-      if (!mediaQuery.includes("640px")) {
-        return `${mediaQuery} {
+  // Close the base style and add responsive grid-template-columns
+  css += "}\n";
+
+  // Breakpoints in mobile-first order
+  const breakpoints = {
+    sm: "0px", // Base mobile (no media query)
+    md: "768px",
+    lg: "1024px",
+    xl: "1280px",
+  };
+
+  // Generate mobile-first CSS
+  Object.entries(breakpoints).forEach(([breakpoint, minWidth]) => {
+    const cols = responsive[breakpoint as keyof typeof responsive];
+
+    if (cols !== undefined) {
+      if (breakpoint === "sm" || minWidth === "0px") {
+        // Base style for mobile (no media query)
+        css += `.${className} {
+  grid-template-columns: repeat(${cols}, 1fr);
+}\n`;
+      } else {
+        // Media query for larger breakpoints
+        css += `@media (min-width: ${minWidth}) {
   .${className} {
-    ${rules.trim()}
+    grid-template-columns: repeat(${cols}, 1fr);
   }
-}`;
+}\n`;
       }
-      return "";
     }
-  );
+  });
 
-  processedCSS += mediaQueryCSS;
-
-  return processedCSS;
+  return css;
 }
 
 /**
@@ -62,17 +70,44 @@ export function generateFieldResponsiveCSS(
   className: string
 ): string {
   const fieldLayout = getFieldLayoutInfo(field);
+
   if (!fieldLayout?.colSpan || typeof fieldLayout.colSpan !== "object") {
     return "";
   }
 
-  const responsiveCSS = generateResponsiveFieldCSS(fieldLayout);
-  if (!responsiveCSS) return "";
+  const colSpan = fieldLayout.colSpan;
+  let css = "";
 
-  // Aplicar el CSS al className específico
-  return responsiveCSS.replace(/(@media[^{]+\{[^}]*\})/g, (match) => {
-    return match.replace(/\{/, `{ .${className} `);
+  // Breakpoints in mobile-first order
+  const breakpoints = {
+    sm: "0px", // Base mobile (no media query)
+    md: "768px",
+    lg: "1024px",
+    xl: "1280px",
+  };
+
+  // Generate mobile-first CSS
+  Object.entries(breakpoints).forEach(([breakpoint, minWidth]) => {
+    const span = colSpan[breakpoint as keyof typeof colSpan];
+
+    if (span !== undefined) {
+      if (breakpoint === "sm" || minWidth === "0px") {
+        // Base style for mobile (no media query)
+        css += `.${className} {
+  grid-column: span ${span};
+}\n`;
+      } else {
+        // Media query for larger breakpoints
+        css += `@media (min-width: ${minWidth}) {
+  .${className} {
+    grid-column: span ${span};
+  }
+}\n`;
+      }
+    }
   });
+
+  return css;
 }
 
 /**
@@ -95,7 +130,7 @@ export function generateFormResponsiveCSS(
   }
 
   // CSS de campos individuales
-  fields.forEach((field, index) => {
+  fields.forEach((field) => {
     const fieldCSS = generateFieldResponsiveCSS(
       field,
       `${baseClassName}-field-${field.name}`
@@ -153,7 +188,7 @@ export function generateDirectResponsiveCSS(
 ): string {
   if (!containerLayout?.responsive) return "";
 
-  const { responsive, columns, gap } = containerLayout;
+  const { responsive } = containerLayout;
   let css = "";
 
   // Breakpoints por defecto (mobile-first)
@@ -171,7 +206,7 @@ export function generateDirectResponsiveCSS(
   });
 
   // Generar CSS mobile-first
-  sortedBreakpoints.forEach(([breakpoint, cols], index) => {
+  sortedBreakpoints.forEach(([breakpoint, cols]) => {
     const minWidth = breakpoints[breakpoint as keyof typeof breakpoints];
 
     if (breakpoint === "sm" || minWidth === "0px") {
@@ -200,14 +235,14 @@ export function useResponsiveCSS(
   containerLayout: any,
   formId: string
 ) {
-  // Intentar primero con la API de la librería
+  // Generate responsive CSS for the form
   let css = generateFormResponsiveCSS(
     fields,
     containerLayout,
     `ui-form-${formId}`
   );
 
-  // Si no hay CSS generado, usar método alternativo
+  // Fallback to direct method if needed
   if (!css && containerLayout?.responsive) {
     css = generateDirectResponsiveCSS(
       containerLayout,
@@ -217,11 +252,11 @@ export function useResponsiveCSS(
 
   const styleId = `ui-form-${formId}-responsive`;
 
-  // Inyectar CSS cuando cambian los datos
+  // Inject CSS when data changes
   React.useEffect(() => {
     injectResponsiveCSS(css, styleId);
 
-    // Cleanup al desmontar el componente
+    // Cleanup on unmount
     return () => cleanupResponsiveCSS(styleId);
   }, [css, styleId]);
 

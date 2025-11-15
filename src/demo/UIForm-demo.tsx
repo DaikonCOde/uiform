@@ -27,9 +27,9 @@ const responsiveColSpanSchema: JsfObjectSchema = {
       "type": "string",
       "x-jsf-layout": {
         "colSpan": {
-          "sm": 2,
+          "sm": 1,
           "md": 1,
-          "lg": 4
+          "lg": 2
         }
       },
       "x-jsf-presentation": {
@@ -49,7 +49,7 @@ const responsiveColSpanSchema: JsfObjectSchema = {
         "colSpan": {
           "sm": 1,
           "md": 2,
-          "lg": 2 
+          "lg": 2
         }
       }
     },
@@ -79,7 +79,7 @@ const responsiveColSpanSchema: JsfObjectSchema = {
         "inputType": 'select',
         "asyncOptions": { 
           "id": 'countriesLoader',
-          "dependencies":  ["country"]
+          'dependencies': ['country']
         },
       },
       "x-jsf-layout": {
@@ -217,24 +217,13 @@ export default function UIFormDemo() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <Title level={2}>UIForm Demo - Complete UI Library</Title>
-      <Text type="secondary">
-        This demo showcases the UIForm component with all field types and responsive layouts integrated with Ant Design.
-      </Text>
-      
+      <Title level={2}>Demo</Title>
       <Divider />
       
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Responsive ColSpan Demo */}
-        <Card title="🆕 Responsive ColSpan Demo" style={{ width: '100%' }}>
-          <Text type="secondary" style={{ display: 'block', marginBottom: '16px' }}>
-            This form demonstrates responsive <strong>colSpan</strong> - fields change their column span based on screen size:
-            <br />
-            • <strong>Title</strong>: Spans full width on all devices (1/2/4 columns)
-            • <strong>Email</strong>: 1 col on mobile, 2 cols on tablet/desktop
-            • <strong>Description</strong>: 1 col on mobile, 2 on tablet, 3 on desktop
-            • <strong>Other fields</strong>: Adapt automatically
-          </Text>
+        <Card title="Responsive ColSpan" style={{ width: '100%' }}>
+          
           <UIForm
             schema={responsiveColSpanSchema}
             initialValues={{}}
