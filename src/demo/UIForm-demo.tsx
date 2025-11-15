@@ -97,7 +97,7 @@ const responsiveColSpanSchema: JsfObjectSchema = {
         "inputType": 'autocomplete',
         "asyncOptions": { 
           "id": 'searchCountry',
-          "searchable": true // Para búsqueda dinámica
+          "searchable": true
         },
       },
     },

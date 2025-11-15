@@ -1,32 +1,71 @@
 {
-  "name": "uiform",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@yourorg/uiform",
+  "version": "0.1.0",
+  "description": "A React form library built on JSON Schema with Ant Design components and responsive layouts",
   "type": "module",
+  "main": "./dist/uiform.umd.cjs",
+  "module": "./dist/uiform.js",
+  "types": "./dist/lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/uiform.js",
+      "require": "./dist/uiform.umd.cjs"
+    },
+    "./style.css": "./dist/uiform.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CLAUDE.md"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:lib": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "peerDependencies": {
+    "antd": "^5.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   },
   "dependencies": {
     "@remoteoss/json-schema-form": "file:/Users/alexocsa/Documents/dev/projects/json-schema-form",
-    "antd": "^5.27.1",
-    "dayjs": "^1.11.18",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "dayjs": "^1.11.18"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.0",
+    "antd": "^5.27.1",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.39.1",
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "vite-plugin-dts": "^4.5.4"
+  },
+  "keywords": [
+    "react",
+    "form",
+    "json-schema",
+    "antd",
+    "ant-design",
+    "responsive",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
   }
 }

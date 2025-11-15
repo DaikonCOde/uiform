@@ -1,69 +1,191 @@
-# React + TypeScript + Vite
+# UIForm
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React form library built on JSON Schema with Ant Design components and responsive layouts.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🎯 **JSON Schema-based**: Define forms using standard JSON Schema
+- 📱 **Responsive Layouts**: Built-in responsive grid system with mobile-first approach
+- 🎨 **Ant Design**: Uses Ant Design components for a polished UI
+- 🔄 **Async Options**: Support for dynamic option loading in Select/Autocomplete fields
+- 📝 **TypeScript**: Full TypeScript support with type definitions
+- ⚡ **Validation**: Automatic validation based on JSON Schema
+- 🎛️ **Customizable**: Configurable layouts, sizes, and validation triggers
 
-## Expanding the ESLint configuration
+## Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install @yourorg/uiform
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Peer Dependencies
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install react react-dom antd
+```
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
+## Quick Start
+
+```typescript
+import { UIForm } from '@yourorg/uiform'
+import '@yourorg/uiform/style.css'
+import type { JsfObjectSchema } from '@yourorg/uiform'
+
+const schema: JsfObjectSchema = {
+  type: "object",
+  properties: {
+    firstName: {
+      title: "First Name",
+      type: "string",
+      "x-jsf-presentation": {
+        inputType: "text"
+      }
     },
+    email: {
+      title: "Email",
+      type: "string",
+      format: "email",
+      "x-jsf-presentation": {
+        inputType: "email"
+      }
+    }
   },
-])
+  required: ["firstName", "email"]
+}
+
+function MyForm() {
+  const handleSubmit = async (values: any, errors?: any) => {
+    if (!errors || Object.keys(errors).length === 0) {
+      console.log('Form submitted:', values)
+    }
+  }
+
+  return (
+    <UIForm
+      schema={schema}
+      onSubmit={handleSubmit}
+      config={{
+        layout: 'vertical',
+        size: 'middle'
+      }}
+    />
+  )
+}
+```
+
+## Responsive Layouts
+
+Create responsive forms that adapt to different screen sizes:
+
+```typescript
+const schema: JsfObjectSchema = {
+  type: "object",
+  "x-jsf-layout": {
+    type: "columns",
+    columns: 4,
+    responsive: {
+      sm: 1,  // 1 column on mobile
+      md: 2,  // 2 columns on tablet
+      lg: 4   // 4 columns on desktop
+    }
+  },
+  properties: {
+    title: {
+      title: "Title",
+      type: "string",
+      "x-jsf-layout": {
+        colSpan: {
+          sm: 1,
+          md: 2,
+          lg: 4  // Spans full width on desktop
+        }
+      }
+    }
+  }
+}
+```
+
+## Supported Field Types
+
+- Text input (`text`, `email`, `hidden`)
+- Number input (`number`, `money`)
+- Textarea (`textarea`)
+- Select dropdown (`select`)
+- Autocomplete with search (`autocomplete`)
+- Radio buttons (`radio`)
+- Checkbox (`checkbox`)
+- Date picker (`date`)
+- File upload (`file`)
+- Fieldset (grouped fields)
+- Group Array (repeatable field groups)
+
+## Documentation
+
+See [LIBRARY_USAGE.md](./LIBRARY_USAGE.md) for comprehensive documentation including:
+
+- Detailed API reference
+- Responsive layout guide
+- Async options loading
+- Validation examples
+- TypeScript usage
+- Advanced features
+
+## Development
+
+### Building the Library
+
+```bash
+npm run build:lib
+```
+
+### Running the Demo
+
+```bash
+npm run dev
+```
+
+### Linting
+
+```bash
+npm run lint
+```
+
+## Architecture
+
+This library is built on top of:
+
+- **[@remoteoss/json-schema-form](https://github.com/remoteoss/json-schema-form)**: Headless JSON Schema form library
+- **[Ant Design](https://ant.design/)**: React UI component library
+- **React**: UI framework
+- **TypeScript**: Type safety
+
+See [CLAUDE.md](./CLAUDE.md) for detailed architecture documentation.
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please read the contributing guidelines before submitting PRs.
+
+## Publishing
+
+Before publishing:
+
+1. Update the `name` field in `package.json` to your organization/package name
+2. Update the `repository` URL in `package.json`
+3. Set the `author` field in `package.json`
+4. Update all references to `@yourorg/uiform` in documentation
+
+To publish:
+
+```bash
+npm publish
+```
+
+For scoped packages:
+
+```bash
+npm publish --access public
 ```
