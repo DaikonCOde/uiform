@@ -19,7 +19,8 @@ export interface FormContextValue extends FormContextState {
   // Métodos para actualizar valores del formulario
   updateFormValue: (name: string, value: any) => void
   setFormValues: (values: Record<string, any>) => void
-  
+  getFormValues: () => Record<string, any>
+
   // Métodos para gestionar cache de async options
   setAsyncOptions: (loaderId: string, options: any[]) => void
   getAsyncOptions: (loaderId: string) => any[] | undefined
@@ -27,7 +28,7 @@ export interface FormContextValue extends FormContextState {
   setAsyncError: (loaderId: string, error: string | null) => void
   isAsyncLoading: (loaderId: string) => boolean
   getAsyncError: (loaderId: string) => string | null
-  
+
   // Método para limpiar cache
   clearAsyncCache: (loaderId?: string) => void
 }

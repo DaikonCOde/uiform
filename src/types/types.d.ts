@@ -22,6 +22,7 @@ export interface BaseFieldProps extends Field {
   onBlur?: (name: string) => void
   className?: string
   style?: React.CSSProperties
+  getFormValues?: () => Record<string, any>
 }
 
 // Props específicos para cada tipo de campo

@@ -192,7 +192,7 @@ export function SelectField({
 
 
   
-  const {jsonType, _rootLayout, errorMessage, ...filteredAntdProps} = antdProps
+  const {jsonType, _rootLayout, errorMessage, getFormValues, ...filteredAntdProps} = antdProps
 
 
   const selectProps = {

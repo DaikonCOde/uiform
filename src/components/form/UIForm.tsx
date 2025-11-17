@@ -1,17 +1,22 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { 
-  createHeadlessForm, 
-  generateCSSGridProperties,
-  getFieldLayoutInfo 
-} from '@remoteoss/json-schema-form'
-import { Form, Button, Space, Alert } from 'antd'
-import { useFieldRenderer } from '../../hooks/useFieldRenderer'
-import { formValuesToJsonValues, getDefaultValuesFromFields } from '../../utils/utils'
-import { useResponsiveCSS } from '../../utils/responsive-layout'
-import { FormProvider } from '../../context/FormContext'
-import { useFormContext } from '../../hooks/useFormContext'
-import type { UIFormProps } from '../../types'
-import styles from './UIForm.module.css'
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
+import { createHeadlessForm } from "@remoteoss/json-schema-form";
+import { Form, Button, Space, Alert } from "antd";
+import { useFieldRenderer } from "../../hooks/useFieldRenderer";
+import {
+  formValuesToJsonValues,
+  getDefaultValuesFromFields,
+} from "../../utils/utils";
+import { useResponsiveCSS } from "../../utils/responsive-layout";
+import { FormProvider } from "../../context/FormContext";
+import { useFormContext } from "../../hooks/useFormContext";
+import type { UIFormProps } from "../../types";
+import styles from "./UIForm.module.css";
 
 // Componente interno que usa el contexto
 function UIFormContent({
@@ -26,56 +31,95 @@ function UIFormContent({
   children,
   ...formProps
 }: UIFormProps & {
-  children?: React.ReactNode
+  children?: React.ReactNode;
 }) {
-  // Obtener contexto del formulario
-  const { setFormValues: setContextFormValues } = useFormContext()
+  // We need to call useFormContext to get the latest context,
+  // but store methods in refs to keep callbacks stable
+  const context = useFormContext();
+
+  // Store context in ref - updated on every render but doesn't affect callback identity
+  const contextRef = useRef(context);
+
+  // Update ref whenever context changes (keeps methods fresh)
+  useEffect(() => {
+    contextRef.current = context;
+  }, [context]);
+
+  // Create stable wrapper functions that access context via ref
+  // These callbacks never change identity, which prevents child re-renders
+  const setContextFormValues = useCallback((values: Record<string, any>) => {
+    contextRef.current?.setFormValues(values);
+  }, []);
+
+  const getFormValues = useCallback(() => {
+    return contextRef.current?.getFormValues() || {};
+  }, []);
+
   const {
     showRequiredMark = true,
-    validateTrigger = 'onChange',
-    size = 'middle',
-    layout = 'horizontal',
-    disabled = false
-  } = config
+    validateTrigger = "onChange",
+    size = "middle",
+    layout = "horizontal",
+    disabled = false,
+  } = config;
 
   // Crear formulario headless con json-schema-form
-  const { fields, handleValidation, isError, error, layout: containerLayout } = useMemo(() => {
+  const {
+    fields,
+    handleValidation,
+    isError,
+    error,
+    layout: containerLayout,
+  } = useMemo(() => {
     try {
       return createHeadlessForm(schema, {
         strictInputType: false,
         initialValues,
         asyncLoaders,
-      })
+      });
     } catch (err) {
-      console.error('Error creating headless form:', err)
-      return { 
-        fields: [], 
-        handleValidation: () => ({ formErrors: { '': 'Error initializing form' } }),
+      console.error("Error creating headless form:", err);
+      return {
+        fields: [],
+        handleValidation: () => ({
+          formErrors: { "": "Error initializing form" },
+        }),
         isError: true,
-        error: 'Failed to initialize form from schema',
-        layout: null
-      }
+        error: "Failed to initialize form from schema",
+        layout: null,
+      };
     }
-  }, [schema, initialValues, asyncLoaders])
+  }, [schema, initialValues, asyncLoaders]);
 
   // Estados del formulario
   const [values, setValues] = useState<Record<string, any>>(() =>
     getDefaultValuesFromFields(fields, initialValues)
-  )
-  const [errors, setErrors] = useState<Record<string, any>>({})
-  const [submitted, setSubmitted] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  );
+  const [errors, setErrors] = useState<Record<string, any>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Generar ID único para el formulario
-  const formId = useMemo(() => Math.random().toString(36).substr(2, 9), [])
-  
+  const formId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
+
+  // Refs para valores estables en callbacks
+  const valuesRef = useRef(values);
+  const onChangeRef = useRef(onChange);
+  const validateTriggerRef = useRef(validateTrigger);
+
+  // Actualizar refs cuando cambien
+  useEffect(() => {
+    valuesRef.current = values;
+    onChangeRef.current = onChange;
+    validateTriggerRef.current = validateTrigger;
+  });
 
   // Hook para manejar CSS responsivo automáticamente
   const { containerClassName, getFieldClassName } = useResponsiveCSS(
-    fields, 
-    containerLayout, 
+    fields,
+    containerLayout,
     formId
-  )
+  );
 
   // Generar estilos CSS para el layout del contenedor
 
@@ -84,120 +128,130 @@ function UIFormContent({
     globalConfig: {
       disabled,
       size,
-      validateTrigger
-    }
-  })
+      validateTrigger,
+    },
+  });
 
   // Función para validar valores
-  const validateValues = useCallback((valuesToValidate: Record<string, any>) => {
-    try {
-      const valuesForJson = formValuesToJsonValues(valuesToValidate, fields)
-      const { formErrors } = handleValidation(valuesForJson)
+  const validateValues = useCallback(
+    (valuesToValidate: Record<string, any>) => {
+      try {
+        const valuesForJson = formValuesToJsonValues(valuesToValidate, fields);
+        const { formErrors } = handleValidation(valuesForJson);
 
-      setErrors(formErrors || {})
+        setErrors(formErrors || {});
 
-      return {
-        errors: formErrors,
-        jsonValues: valuesForJson
+        return {
+          errors: formErrors,
+          jsonValues: valuesForJson,
+        };
+      } catch (err) {
+        console.error("Validation error:", err);
+        const errorMsg = "Validation failed";
+        setErrors({ "": errorMsg });
+        return {
+          errors: { "": errorMsg },
+          jsonValues: valuesToValidate,
+        };
       }
-    } catch (err) {
-      console.error('Validation error:', err)
-      const errorMsg = 'Validation failed'
-      setErrors({ '': errorMsg })
-      return {
-        errors: { '': errorMsg },
-        jsonValues: valuesToValidate
-      }
-    }
-  }, [fields, handleValidation])
+    },
+    [fields, handleValidation]
+  );
 
-  // Manejar cambios de campo
-  const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    setValues((prevValues) => {
-      const newValues = {
-        ...prevValues,
-        [fieldName]: value
-      }
-      
-      // Actualizar contexto con los nuevos valores
-      setContextFormValues(newValues)
-      
-      // Validar según la configuración
-      if (validateTrigger === 'onChange') {
-        // Usar setTimeout para asegurar que la validación ocurre después del render
-        setTimeout(() => {
-          const validation = validateValues(newValues)
-          // Llamar onChange si está definido
-          onChange?.(validation.jsonValues, validation.errors)
-        }, 0)
-      }
-      
-      return newValues
-    })
-  }, [validateTrigger, validateValues, onChange, setContextFormValues])
+  // Manejar cambios de campo - ESTABLE (no cambia en cada render)
+  const handleFieldChange = useCallback(
+    (fieldName: string, value: any) => {
+      setValues((prevValues) => {
+        const newValues = {
+          ...prevValues,
+          [fieldName]: value,
+        };
 
-  // Manejar blur de campo
-  const handleFieldBlur = useCallback((_fieldName: string) => {
-    if (validateTrigger === 'onBlur') {
-      const validation = validateValues(values)
-      onChange?.(validation.jsonValues, validation.errors)
-    }
-  }, [values, validateTrigger, validateValues, onChange])
+        // Actualizar contexto con los nuevos valores
+        setContextFormValues(newValues);
+
+        // Validar según la configuración usando ref
+        if (validateTriggerRef.current === "onChange") {
+          // Usar setTimeout para asegurar que la validación ocurre después del render
+          setTimeout(() => {
+            const validation = validateValues(newValues);
+            // Llamar onChange si está definido usando ref
+            onChangeRef.current?.(validation.jsonValues, validation.errors);
+          }, 0);
+        }
+
+        return newValues;
+      });
+    },
+    [validateValues, setContextFormValues]
+  ); // Solo depende de funciones estables
+
+  // Manejar blur de campo - ESTABLE (no cambia en cada render)
+  const handleFieldBlur = useCallback(
+    (_fieldName: string) => {
+      // Usar refs para obtener valores actuales
+      if (validateTriggerRef.current === "onBlur") {
+        const validation = validateValues(valuesRef.current);
+        onChangeRef.current?.(validation.jsonValues, validation.errors);
+      }
+    },
+    [validateValues]
+  ); // Solo depende de validateValues que es estable
 
   // Manejar envío del formulario
   const handleSubmit = useCallback(async () => {
-    setSubmitted(true)
-    setIsSubmitting(true)
+    setSubmitted(true);
+    setIsSubmitting(true);
 
     try {
-      const validation = validateValues(values)
+      const validation = validateValues(values);
 
       // Si hay errores, no enviar
       if (validation.errors && Object.keys(validation.errors).length > 0) {
-        setIsSubmitting(false)
-        return
+        setIsSubmitting(false);
+        return;
       }
 
       // Llamar onSubmit si está definido
       if (onSubmit) {
-        await onSubmit(validation.jsonValues, validation.errors)
+        await onSubmit(validation.jsonValues, validation.errors);
       }
     } catch (err) {
-      console.error('Submit error:', err)
-      setErrors({ '': 'Failed to submit form' })
+      console.error("Submit error:", err);
+      setErrors({ "": "Failed to submit form" });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }, [values, validateValues, onSubmit])
+  }, [values, validateValues, onSubmit]);
 
   // Sincronizar valores iniciales con el contexto
   useEffect(() => {
-    const newValues = getDefaultValuesFromFields(fields, initialValues)
-    setValues(newValues)
-    setContextFormValues(newValues)
-  }, []) // Solo al montar
-  
+    const newValues = getDefaultValuesFromFields(fields, initialValues);
+    setValues(newValues);
+    setContextFormValues(newValues);
+  }, []); // Solo al montar
+
   // Actualizar cuando cambian initialValues (después del montaje inicial)
   useEffect(() => {
     if (Object.keys(initialValues).length > 0) {
-      const newValues = getDefaultValuesFromFields(fields, initialValues)
-      setValues(newValues)
-      setContextFormValues(newValues)
+      const newValues = getDefaultValuesFromFields(fields, initialValues);
+      setValues(newValues);
+      setContextFormValues(newValues);
     }
-  }, [initialValues, fields, setContextFormValues])
+  }, [initialValues, fields, setContextFormValues]);
 
   // Si hay error en la inicialización, mostrar mensaje
   if (isError) {
     return (
       <Alert
         message="Form Initialization Error"
-        description={error || 'Failed to initialize form from schema'}
+        description={error || "Failed to initialize form from schema"}
         type="error"
         showIcon
         className={className}
         style={style}
       />
-    )
+    );
   }
 
   return (
@@ -211,9 +265,9 @@ function UIFormContent({
         {...formProps}
       >
         {/* Error general del formulario */}
-        {errors[''] && (
+        {errors[""] && (
           <Alert
-            message={errors['']}
+            message={errors[""]}
             type="error"
             showIcon
             className={styles.formError}
@@ -221,9 +275,7 @@ function UIFormContent({
         )}
 
         {/* Renderizar campos con layout */}
-        <div 
-          className={containerClassName}
-        >
+        <div className={containerClassName}>
           {fields.map((field, index) => {
             const fieldWithProps = {
               ...field,
@@ -231,20 +283,21 @@ function UIFormContent({
               error: errors[field.name],
               submitted,
               onChange: handleFieldChange,
-              onBlur: handleFieldBlur
-            }
+              onBlur: handleFieldBlur,
+              getFormValues,
+            };
 
             // Obtener layout específico del campo
-            const fieldClassName = getFieldClassName(field.name)
+            const fieldClassName = getFieldClassName(field.name);
 
             return (
-              <Form.Item 
-                key={field.name} 
+              <Form.Item
+                key={field.name}
                 className={`${styles.fieldItem} ${fieldClassName}`}
               >
                 {renderField(fieldWithProps, index)}
               </Form.Item>
-            )
+            );
           })}
         </div>
 
@@ -263,11 +316,11 @@ function UIFormContent({
               {/* Botón de reset opcional */}
               <Button
                 onClick={() => {
-                  const resetValues = getDefaultValuesFromFields(fields, {})
-                  setValues(resetValues)
-                  setContextFormValues(resetValues)
-                  setErrors({})
-                  setSubmitted(false)
+                  const resetValues = getDefaultValuesFromFields(fields, {});
+                  setValues(resetValues);
+                  setContextFormValues(resetValues);
+                  setErrors({});
+                  setSubmitted(false);
                 }}
                 disabled={disabled || isSubmitting}
               >
@@ -279,13 +332,11 @@ function UIFormContent({
 
         {/* Contenido personalizado (botones, etc.) */}
         {children && (
-          <Form.Item className={styles.submitContainer}>
-            {children}
-          </Form.Item>
+          <Form.Item className={styles.submitContainer}>{children}</Form.Item>
         )}
       </Form>
     </div>
-  )
+  );
 }
 
 // Componente exportado que envuelve con FormProvider
@@ -294,7 +345,7 @@ export function UIForm(props: UIFormProps & { children?: React.ReactNode }) {
     <FormProvider initialValues={props.initialValues}>
       <UIFormContent {...props} />
     </FormProvider>
-  )
+  );
 }
 
-export default UIForm
+export default UIForm;

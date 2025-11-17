@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, Space, Typography, Divider } from 'antd';
 import { UIForm } from "../components/form/UIForm";
 import type { AsyncOptionsLoader, JsfObjectSchema } from "@remoteoss/json-schema-form";
@@ -185,10 +185,11 @@ export default function UIFormDemo() {
     setResponsiveData(values);
     console.log('Responsive form changed:', { values, errors });
   }
-  const asyncLoader: Record<string, AsyncOptionsLoader> = {
-    countriesLoader: async (context) => {
-      console.log({context})
 
+  // CRITICAL: useMemo to prevent asyncLoader from being recreated on every render
+  // Without this, createHeadlessForm re-runs and loses asyncOptions.loader
+  const asyncLoader: Record<string, AsyncOptionsLoader> = useMemo(() => ({
+    countriesLoader: async (context) => {
       const { formValues } = context
       const countryCode = formValues.country
 
@@ -196,11 +197,11 @@ export default function UIFormDemo() {
       if (!countryCode) {
         return { options: [] }
       }
-        const req = await fetch('https://fakeapi.net/users')
-        const res = await req.json()
+      const req = await fetch('https://fakeapi.net/users')
+      const res = await req.json()
 
-        console.log(res)
-        return {options: res.data.map((d: any) => ({label: d.username, value: d.id}) )}
+      console.log(res)
+      return {options: res.data.map((d: any) => ({label: d.username, value: d.id}) )}
     },
     searchCountry: async (context) => {
       const { formValues, search } = context
@@ -213,7 +214,7 @@ export default function UIFormDemo() {
       console.log(res)
       return {options: res.data.map((d: any) => ({label: d.username, value: d.id?.toString()}) )}
     }
-  }
+  }), []); // Empty deps = created once, never changes
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>

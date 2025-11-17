@@ -44,7 +44,7 @@ export function TextareaField({
 
   if (!isVisible) return null
 
-  const {jsonType, _rootLayout, ...filteredAntdProps} = antdProps
+  const {jsonType, _rootLayout, getFormValues, ...filteredAntdProps} = antdProps
 
   const textareaProps = {
     id: name,

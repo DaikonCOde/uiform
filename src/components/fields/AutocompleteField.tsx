@@ -7,12 +7,11 @@ import React, {
 } from "react";
 import { AutoComplete, Spin } from "antd";
 import { ErrorMessage, FieldLabel } from "../commons";
-import { useFormContext } from "../../hooks/useFormContext";
 import type { AutocompleteFieldProps } from "../../types";
 import styles from "./Field.module.css";
 
-// Wrapper interno que mantiene el input estable
-const StableAutocomplete = React.memo(({ 
+// Wrapper interno simplificado - ya no necesita workaround de focus
+const StableAutocomplete = React.memo(({
   inputValue,
   onInputChange,
   onSelectOption,
@@ -32,12 +31,8 @@ const StableAutocomplete = React.memo(({
   name,
   filteredAntdProps
 }: any) => {
-  const inputRef = useRef<any>(null);
-  
   return (
     <AutoComplete
-      ref={inputRef}
-      key={`autocomplete-${name}`}
       id={name}
       value={inputValue}
       onChange={onInputChange}
@@ -45,7 +40,7 @@ const StableAutocomplete = React.memo(({
       onBlur={onBlurHandler}
       onSearch={isSearchable ? onSearchHandler : undefined}
       placeholder={placeholder || `Search...`}
-      disabled={disabled || loading}
+      disabled={disabled}  // Don't disable on loading - causes focus loss
       allowClear={allowClear}
       options={autocompleteOptions}
       filterOption={false}
@@ -66,14 +61,15 @@ const StableAutocomplete = React.memo(({
     />
   );
 }, (prevProps, nextProps) => {
-  // Comparar solo props que realmente deben causar re-render
+  // Solo re-renderizar si props críticas cambian
   return (
     prevProps.inputValue === nextProps.inputValue &&
     prevProps.disabled === nextProps.disabled &&
     prevProps.loading === nextProps.loading &&
     prevProps.error === nextProps.error &&
     prevProps.asyncError === nextProps.asyncError &&
-    JSON.stringify(prevProps.autocompleteOptions) === JSON.stringify(nextProps.autocompleteOptions)
+    prevProps.name === nextProps.name &&
+    prevProps.autocompleteOptions?.length === nextProps.autocompleteOptions?.length
   );
 });
 
@@ -97,27 +93,21 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   options,
   allowClear = true,
   asyncOptions,
+  getFormValues,
   ...antdProps
 }: AutocompleteFieldProps) {
-  const {
-    formValues,
-    getAsyncOptions,
-    setAsyncOptions,
-    isAsyncLoading,
-    setAsyncLoading,
-    getAsyncError,
-    setAsyncError,
-  } = useFormContext();
+  // getFormValues now comes from props to avoid context subscription
 
   const [internalTouched, setInternalTouched] = useState(false);
   const isTouched = touched ?? internalTouched;
 
   // Estado local para el valor del input (necesario para AutoComplete de Ant Design)
   const [inputValue, setInputValue] = useState<string>("");
-  // Ref para acceder al componente AutoComplete
-  const inputRef = useRef<any>(null);
-  // Ref para evitar actualizaciones mientras se escribe
-  const isTypingRef = useRef(false);
+
+  // NUEVO: Estado interno para async options (en lugar de context)
+  const [internalOptions, setInternalOptions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [asyncError, setAsyncError] = useState<string | null>(null);
 
   // Determinar si el campo usa async options y su ID
   const asyncLoaderId = asyncOptions?.id;
@@ -125,85 +115,59 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     return !!asyncOptions?.loader && !!asyncLoaderId;
   }, [asyncOptions, asyncLoaderId]);
 
-  // Obtener opciones y estado desde el contexto
-  const cachedOptions = asyncLoaderId
-    ? getAsyncOptions(asyncLoaderId)
-    : undefined;
-  const loading = asyncLoaderId ? isAsyncLoading(asyncLoaderId) : false;
-  const asyncError = asyncLoaderId ? getAsyncError(asyncLoaderId) : null;
-
-  // Ref para tracking de carga inicial
-  const hasLoadedRef = useRef(false);
-  const prevDepsRef = useRef<string>("");
-
-  // Ref para mantener la referencia más actual de asyncOptions y formValues
+  // Ref para mantener la referencia más actual de asyncOptions
   const asyncOptionsRef = useRef(asyncOptions);
-  const formValuesRef = useRef(formValues);
 
   // Actualizar refs en cada render
   useEffect(() => {
     asyncOptionsRef.current = asyncOptions;
-    formValuesRef.current = formValues;
-  });
+    console.log({asyncOptions})
 
-  // Obtener valores de dependencias si existen
-  const dependencies = asyncOptions?.dependencies || [];
-  const dependencyValuesStr = JSON.stringify(
-    dependencies.map((dep) => formValues[dep])
-  );
+  }, [asyncOptions]);
 
   // Cargar opciones async al montar (si no es searchable)
+  // Este effect NO se ejecuta cuando formValues cambia (para evitar re-renders)
+  // Solo se ejecuta cuando el loader o sus dependencias estructurales cambian
   useEffect(() => {
     if (!hasAsyncOptions || !asyncLoaderId) return;
 
     const asyncConfig = asyncOptions;
     if (!asyncConfig?.loader || asyncConfig.searchable) return;
 
-    // Verificar si ya se cargó y las dependencias no cambiaron
-    const depsChanged = prevDepsRef.current !== dependencyValuesStr;
-
-    if (hasLoadedRef.current && !depsChanged) {
-      return; // Ya se cargó y no hay cambios en dependencias
-    }
-
-    // Si hay opciones en cache y no cambiaron las dependencias, no recargar
-    if (cachedOptions && cachedOptions.length > 0 && !depsChanged) {
-      hasLoadedRef.current = true;
-      return;
-    }
-
     const loadAsyncOptions = async () => {
       if (!asyncConfig.loader) return; // Extra safety check
 
-      setAsyncLoading(asyncLoaderId, true);
-      setAsyncError(asyncLoaderId, null);
+      setLoading(true);
+      setAsyncError(null);
 
       try {
+        // Get current form values without subscribing
+        if (!getFormValues) return;
+        const currentFormValues = getFormValues();
+
         // Pasar el contexto completo al loader
-        const result = await asyncConfig.loader({ formValues, search: "" });
-        setAsyncOptions(asyncLoaderId, result.options || []);
-        hasLoadedRef.current = true;
-        prevDepsRef.current = dependencyValuesStr;
+        const result = await asyncConfig.loader({ formValues: currentFormValues, search: "" });
+        setInternalOptions(result.options || []);
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to load options";
-        setAsyncError(asyncLoaderId, errorMsg);
-        setAsyncOptions(asyncLoaderId, []);
+        setAsyncError(errorMsg);
+        setInternalOptions([]);
       } finally {
-        setAsyncLoading(asyncLoaderId, false);
+        setLoading(false);
       }
     };
 
     loadAsyncOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAsyncOptions, asyncLoaderId, dependencyValuesStr]);
+  }, [hasAsyncOptions, asyncLoaderId]);
 
   // Mapa de value -> label para encontrar el label cuando tenemos solo el value
   const valueToLabelMap = useMemo(() => {
     const map = new Map<string, string>();
 
-    if (hasAsyncOptions && cachedOptions && cachedOptions.length > 0) {
-      cachedOptions.forEach((option: any) => {
+    if (hasAsyncOptions && internalOptions.length > 0) {
+      internalOptions.forEach((option: any) => {
         if (typeof option === "object" && option !== null) {
           map.set(
             String(option.value),
@@ -227,31 +191,34 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     }
 
     return map;
-  }, [options, hasAsyncOptions, cachedOptions]);
+  }, [options, hasAsyncOptions, internalOptions]);
 
-  // Sincronizar valor inicial y cuando cambia desde el padre (reset, etc)
+  // Ref para trackear el valor anterior y detectar cambios reales
+  const prevValueRef = useRef(value);
+
+  // Sincronizar SOLO cuando el value del form realmente cambia (no cuando el usuario escribe)
   useEffect(() => {
-    // Solo actualizar si NO estamos escribiendo
-    if (isTypingRef.current) return;
-    
-    if (value) {
-      const label = valueToLabelMap.get(String(value));
-      const newValue = label || String(value);
-      if (newValue !== inputValue) {
+    // Solo actuar si el value del form cambió realmente
+    if (value !== prevValueRef.current) {
+      if (value) {
+        // Hay un nuevo value del form, sincronizar el input
+        const label = valueToLabelMap.get(String(value));
+        const newValue = label || String(value);
         setInputValue(newValue);
+      } else {
+        // El value cambió a vacío (reset explícito del form)
+        setInputValue("");
       }
-    } else if (inputValue) {
-      // Limpiar cuando el valor se resetea
-      setInputValue("");
+      prevValueRef.current = value;
     }
-  }, [value, valueToLabelMap, inputValue]);
+  }, [value, valueToLabelMap]);
 
   // Handler para búsqueda en async options
   const handleSearch = useCallback(
     async (searchValue: string) => {
-      // Usar refs para obtener los valores más actuales
+      console.log({searchValue})
+      // Usar ref para obtener la configuración async más actual
       const asyncConfig = asyncOptionsRef.current;
-      const currentFormValues = formValuesRef.current;
 
       // Si no hay configuración async o no es searchable, no hacer nada
       if (!asyncConfig?.loader || !asyncLoaderId) return;
@@ -259,33 +226,36 @@ export const AutocompleteField = React.memo(function AutocompleteField({
       // Si el searchValue está vacío y no es searchable, no buscar
       if (!searchValue && !asyncConfig.searchable) return;
 
-      setAsyncLoading(asyncLoaderId, true);
-      setAsyncError(asyncLoaderId, null);
+      setLoading(true);
+      setAsyncError(null);
 
       try {
-        // Usar valores actuales de los refs
+        if (!getFormValues) return;
+        // Get current form values without subscribing
+        const currentFormValues = getFormValues();
+
+        // Llamar al loader con los valores actuales
         const result = await asyncConfig.loader({
           search: searchValue,
           formValues: currentFormValues,
         });
-        setAsyncOptions(asyncLoaderId, result.options || []);
+        setInternalOptions(result.options || []);
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to search options";
-        setAsyncError(asyncLoaderId, errorMsg);
-        setAsyncOptions(asyncLoaderId, []);
+        setAsyncError(errorMsg);
+        setInternalOptions([]);
       } finally {
-      setAsyncLoading(asyncLoaderId, false);
+        setLoading(false);
       }
     },
-    [asyncLoaderId]
+    [asyncLoaderId]  // getFormValues is stable, no need in deps
   );
 
   // Handler cuando se selecciona una opción del dropdown
   const handleSelect = useCallback(
     (selectedValue: string, option: any) => {
       if (!internalTouched) setInternalTouched(true);
-      isTypingRef.current = false; // Ya no está escribiendo
 
       // Actualizar el estado
       const label = option?.label || selectedValue;
@@ -300,14 +270,13 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   // Handler cuando se cambia el input manualmente (sin seleccionar)
   const handleChange = useCallback(
     (val: string) => {
-      isTypingRef.current = true; // Marcar que está escribiendo
+
       setInputValue(val); // Actualizar estado (causa re-render pero necesario)
 
       // Solo limpiar el form value si el input se vacía completamente
       if (!val && value) {
         if (!internalTouched) setInternalTouched(true);
         onChange(name, "");
-        isTypingRef.current = false;
       }
     },
     [name, onChange, value, internalTouched]
@@ -324,10 +293,10 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   // Determinar las opciones a usar
   const autocompleteOptions = useMemo(() => {
     let newOptions: any[] = [];
-    
-    // Si tiene async options, usar las del cache
-    if (hasAsyncOptions && cachedOptions && cachedOptions.length > 0) {
-      newOptions = cachedOptions.map((option: any) => {
+
+    // Si tiene async options, usar las internas
+    if (hasAsyncOptions && internalOptions.length > 0) {
+      newOptions = internalOptions.map((option: any) => {
         if (typeof option === "object" && option !== null) {
           return {
             label: option.label || option.title || String(option.value),
@@ -357,14 +326,14 @@ export const AutocompleteField = React.memo(function AutocompleteField({
         };
       });
     }
-    
+
     // Solo actualizar si realmente cambiaron
     if (JSON.stringify(newOptions) !== JSON.stringify(optionsRef.current)) {
       optionsRef.current = newOptions;
     }
-    
+
     return optionsRef.current;
-  }, [options, hasAsyncOptions, cachedOptions]);
+  }, [options, hasAsyncOptions, internalOptions]);
 
   // Memoizar las props del AutoComplete para evitar re-creación innecesaria
   const isSearchable = hasAsyncOptions ? asyncOptions?.searchable : true;
