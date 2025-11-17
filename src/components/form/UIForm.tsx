@@ -167,9 +167,6 @@ function UIFormContent({
           [fieldName]: value,
         };
 
-        // Actualizar contexto con los nuevos valores
-        setContextFormValues(newValues);
-
         // Validar según la configuración usando ref
         if (validateTriggerRef.current === "onChange") {
           // Usar setTimeout para asegurar que la validación ocurre después del render
@@ -183,7 +180,7 @@ function UIFormContent({
         return newValues;
       });
     },
-    [validateValues, setContextFormValues]
+    [validateValues]
   ); // Solo depende de funciones estables
 
   // Manejar blur de campo - ESTABLE (no cambia en cada render)
@@ -224,21 +221,19 @@ function UIFormContent({
     }
   }, [values, validateValues, onSubmit]);
 
-  // Sincronizar valores iniciales con el contexto
+  // Sincronizar values locales con el contexto automáticamente
+  // Este useEffect se ejecuta cada vez que values cambia (incluyendo onChange)
   useEffect(() => {
-    const newValues = getDefaultValuesFromFields(fields, initialValues);
-    setValues(newValues);
-    setContextFormValues(newValues);
-  }, []); // Solo al montar
+    setContextFormValues(values);
+  }, [values, setContextFormValues]);
 
   // Actualizar cuando cambian initialValues (después del montaje inicial)
   useEffect(() => {
     if (Object.keys(initialValues).length > 0) {
       const newValues = getDefaultValuesFromFields(fields, initialValues);
       setValues(newValues);
-      setContextFormValues(newValues);
     }
-  }, [initialValues, fields, setContextFormValues]);
+  }, [initialValues, fields]);
 
   // Si hay error en la inicialización, mostrar mensaje
   if (isError) {
