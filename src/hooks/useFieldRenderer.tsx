@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react'
-import type { Field } from '@remoteoss/json-schema-form'
+import type { Field } from '@laus/json-schema-form'
 import {
   TextField,
   NumberField,

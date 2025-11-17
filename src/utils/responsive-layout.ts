@@ -1,7 +1,7 @@
 import React from "react";
 import {
   getFieldLayoutInfo,
-} from "@remoteoss/json-schema-form";
+} from "@laus/json-schema-form";
 
 /**
  * Genera CSS responsivo para el contenedor del formulario

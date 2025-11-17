@@ -21,7 +21,7 @@ export default defineConfig({
     },
     rollupOptions: {
       // Externalize dependencies that shouldn't be bundled
-      external: ['react', 'react-dom', 'react/jsx-runtime', 'antd', '@remoteoss/json-schema-form', 'dayjs'],
+      external: ['react', 'react-dom', 'react/jsx-runtime', 'antd', '@laus/json-schema-form', 'dayjs'],
       output: {
         // Global variables to use in UMD build for externalized deps
         globals: {
@@ -29,7 +29,7 @@ export default defineConfig({
           'react-dom': 'ReactDOM',
           'react/jsx-runtime': 'jsxRuntime',
           antd: 'antd',
-          '@remoteoss/json-schema-form': 'JsonSchemaForm',
+          '@laus/json-schema-form': 'JsonSchemaForm',
           dayjs: 'dayjs',
         },
         // Preserve CSS modules

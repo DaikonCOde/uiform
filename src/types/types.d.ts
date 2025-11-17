@@ -1,5 +1,5 @@
  
-import type { Field, FieldType as JSFFieldType, SchemaValue } from "@remoteoss/json-schema-form"
+import type { Field, FieldType as JSFFieldType, SchemaValue } from "@laus/json-schema-form"
 import type { 
   InputProps, 
   SelectProps, 

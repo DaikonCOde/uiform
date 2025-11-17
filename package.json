@@ -1,5 +1,5 @@
 {
-  "name": "@yourorg/uiform",
+  "name": "@laus/uiform",
   "version": "0.1.0",
   "description": "A React form library built on JSON Schema with Ant Design components and responsive layouts",
   "type": "module",
@@ -33,7 +33,7 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
-    "@remoteoss/json-schema-form": "file:/Users/alexocsa/Documents/dev/projects/json-schema-form",
+    "@laus/json-schema-form": "^0.1.0",
     "dayjs": "^1.11.18"
   },
   "devDependencies": {
@@ -62,10 +62,14 @@
     "responsive",
     "typescript"
   ],
-  "author": "",
+  "author": "DaikonCode",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/DaikonCOde/uiform.git"
+  },
+  "homepage": "https://github.com/DaikonCOde/uiform#readme",
+  "bugs": {
+    "url": "https://github.com/DaikonCOde/uiform/issues"
   }
 }

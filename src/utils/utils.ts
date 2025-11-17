@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Field } from "@remoteoss/json-schema-form";
+import type { Field } from "@laus/json-schema-form";
 import { setDeep } from "./setDeep";
 
 

@@ -22,4 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary files
 warp.md
+*.tsbuildinfo
+
+# Documentation artifacts (temporary debug docs)
+docs/AUTOCOMPLETE_FOCUS_FIX*.md
+docs/FINAL_BUG_FIXES.md
+docs/RECOMMENDED_SOLUTIONS.md
+docs/ROOT_CAUSE_ANALYSIS.md
+docs/SOLUTION_*.md
+
+# Build artifacts
+.npmignore
+LIBRARY_SETUP_SUMMARY.md

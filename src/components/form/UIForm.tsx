@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { createHeadlessForm } from "@remoteoss/json-schema-form";
+import { createHeadlessForm } from "@laus/json-schema-form";
 import { Form, Button, Space, Alert } from "antd";
 import { useFieldRenderer } from "../../hooks/useFieldRenderer";
 import {

@@ -14,22 +14,56 @@ A React form library built on JSON Schema with Ant Design components and respons
 
 ## Installation
 
+### From GitHub
+
 ```bash
-npm install @yourorg/uiform
+npm install DaikonCOde/uiform
+```
+
+Or with a specific version/tag:
+
+```bash
+npm install DaikonCOde/uiform#v0.1.0
+```
+
+Or clone and link locally:
+
+```bash
+git clone https://github.com/DaikonCOde/uiform.git
+cd uiform
+npm install
+npm run build:lib
+npm link
+```
+
+Then in your project:
+
+```bash
+npm link @laus/uiform
 ```
 
 ### Peer Dependencies
+
+Make sure to install the required peer dependencies:
 
 ```bash
 npm install react react-dom antd
 ```
 
+### Dependencies
+
+This library also requires:
+
+```bash
+npm install @laus/json-schema-form dayjs
+```
+
 ## Quick Start
 
 ```typescript
-import { UIForm } from '@yourorg/uiform'
-import '@yourorg/uiform/style.css'
-import type { JsfObjectSchema } from '@yourorg/uiform'
+import { UIForm } from '@laus/uiform'
+import '@laus/uiform/dist/style.css'
+import type { JsfObjectSchema } from '@laus/uiform'
 
 const schema: JsfObjectSchema = {
   type: "object",
@@ -154,7 +188,7 @@ npm run lint
 
 This library is built on top of:
 
-- **[@remoteoss/json-schema-form](https://github.com/remoteoss/json-schema-form)**: Headless JSON Schema form library
+- **[@laus/json-schema-form](https://github.com/DaikonCOde/json-schema-form)**: Headless JSON Schema form library
 - **[Ant Design](https://ant.design/)**: React UI component library
 - **React**: UI framework
 - **TypeScript**: Type safety
@@ -171,21 +205,15 @@ Contributions are welcome! Please read the contributing guidelines before submit
 
 ## Publishing
 
-Before publishing:
-
-1. Update the `name` field in `package.json` to your organization/package name
-2. Update the `repository` URL in `package.json`
-3. Set the `author` field in `package.json`
-4. Update all references to `@yourorg/uiform` in documentation
-
-To publish:
+This library is published on GitHub. To install it in your project:
 
 ```bash
-npm publish
+npm install DaikonCOde/uiform
 ```
 
-For scoped packages:
+To publish a new version:
 
-```bash
-npm publish --access public
-```
+1. Update the version in `package.json`
+2. Create a git tag: `git tag v0.1.0`
+3. Push the tag: `git push origin v0.1.0`
+4. Users can then install: `npm install DaikonCOde/uiform#v0.1.0`

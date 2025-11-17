@@ -57,7 +57,7 @@ export type {
   AsyncOptionsLoaderResult,
   JsfLayoutConfig,
   ResponsiveBreakpoints,
-} from '@remoteoss/json-schema-form'
+} from '@laus/json-schema-form'
 
 // CSS - users will need to import this separately
 // import '@yourorg/uiform/dist/style.css'
