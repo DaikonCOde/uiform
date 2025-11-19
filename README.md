@@ -44,11 +44,19 @@ npm link @laus/uiform
 
 ### Peer Dependencies
 
-Make sure to install the required peer dependencies:
+This library is compatible with **React 17 and 18**:
 
+**For React 18 projects (recommended):**
 ```bash
-npm install react react-dom antd
+npm install react@18 react-dom@18 antd@5
 ```
+
+**For React 17 projects:**
+```bash
+npm install react@17 react-dom@17 antd@4
+```
+
+> **Note**: Ant Design 5 requires React 18+. If you're using React 17, you must use Ant Design 4.
 
 ### Dependencies
 

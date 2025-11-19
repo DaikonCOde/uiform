@@ -1,6 +1,6 @@
 {
   "name": "@laus/uiform",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A React form library built on JSON Schema with Ant Design components and responsive layouts",
   "type": "module",
   "main": "./dist/uiform.umd.cjs",
@@ -28,12 +28,17 @@
     "prepublishOnly": "npm run build:lib"
   },
   "peerDependencies": {
-    "antd": "^5.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "antd": "^4.0.0 || ^5.0.0",
+    "react": "^17.0.0 || ^18.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "antd": {
+      "optional": false
+    }
   },
   "dependencies": {
-    "@laus/json-schema-form": "^0.1.0",
+    "@laus/json-schema-form": "^1.2.4",
     "dayjs": "^1.11.18"
   },
   "devDependencies": {
