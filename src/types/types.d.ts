@@ -118,6 +118,7 @@ export type AsyncOptionsLoader = (context: any) => Promise<{ options: any[] }>
 // Props del componente principal JForm
 export interface UIFormProps {
   schema: any // JsfObjectSchema from json-schema-form
+  formId?: string // ID del formulario para vincular con botones externos
   initialValues?: Record<string, any>
   asyncLoaders?: Record<string, AsyncOptionsLoader> // Mapeador de funciones async
   onSubmit?: (values: any, errors?: any) => void | Promise<void>

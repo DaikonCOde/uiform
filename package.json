@@ -1,6 +1,6 @@
 {
   "name": "@laus/uiform",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "A React form library built on JSON Schema with Ant Design components and responsive layouts",
   "type": "module",
   "main": "./dist/uiform.umd.cjs",
@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -p tsconfig.lib.json && vite build",
     "build:lib": "vite build",
     "build:watch": "vite build --watch",
     "yalc:push": "yalc push",
@@ -41,11 +41,12 @@
     }
   },
   "dependencies": {
-    "@laus/json-schema-form": "file:.yalc/@laus/json-schema-form",
+    "@laus/json-schema-form": "^1.2.4",
     "dayjs": "^1.11.18"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@types/node": "^24.10.1",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.0",

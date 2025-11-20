@@ -21,6 +21,7 @@ import styles from "./UIForm.module.css";
 // Componente interno que usa el contexto
 function UIFormContent({
   schema,
+  formId: externalFormId,
   initialValues = {},
   asyncLoaders = {},
   onSubmit,
@@ -99,8 +100,11 @@ function UIFormContent({
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Generar ID único para el formulario
-  const formId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
+  // Generar ID único para el formulario (usar el externo si se proporciona)
+  const formId = useMemo(
+    () => externalFormId || `ui-form-${Math.random().toString(36).substr(2, 9)}`,
+    [externalFormId]
+  );
 
   // Refs para valores estables en callbacks
   const valuesRef = useRef(values);
@@ -201,6 +205,7 @@ function UIFormContent({
     setIsSubmitting(true);
 
     try {
+      // Usar valores actuales del estado, no los de Ant Design
       const validation = validateValues(values);
 
       // Si hay errores, no enviar
@@ -252,6 +257,7 @@ function UIFormContent({
   return (
     <div className={className} style={style}>
       <Form
+        id={formId}
         layout={layout}
         size={size}
         requiredMark={showRequiredMark}
@@ -296,8 +302,12 @@ function UIFormContent({
           })}
         </div>
 
-        {/* Botón de envío por defecto si se proporciona onSubmit */}
-        {onSubmit && !children && (
+        {/* Botón de envío por defecto solo si:
+            - Se proporciona onSubmit
+            - No se pasa children
+            - No se proporciona formId externo (para botones externos)
+        */}
+        {onSubmit && !children && !externalFormId && (
           <Form.Item className={styles.submitContainer}>
             <Space>
               <Button
