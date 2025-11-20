@@ -37,3 +37,6 @@ docs/SOLUTION_*.md
 # Build artifacts
 .npmignore
 LIBRARY_SETUP_SUMMARY.md
+yalc.lock
+.yalc/
+nodemon.json
