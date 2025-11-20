@@ -155,6 +155,8 @@ export function DateField({
 
   if (!isVisible) return null
 
+  const {type, jsonType, _rootLayout, errorMessage, getFormValues,...filteredAntdProps} = antdProps
+
   const datePickerProps = {
     id: name,
     value: dayjsValue,
@@ -173,7 +175,7 @@ export function DateField({
     'aria-describedby': error ? `${name}-error` : undefined,
     'aria-required': required,
     style: { width: '100%' },
-    ...antdProps
+    ...filteredAntdProps
   }
 
   return (

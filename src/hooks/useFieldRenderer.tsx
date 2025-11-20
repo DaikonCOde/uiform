@@ -51,8 +51,6 @@ export function useFieldRenderer(options: UseFieldRendererOptions = {}) {
   const {
     customComponents = {},
     globalConfig = {},
-    onFieldChange,
-    onFieldBlur
   } = options
 
   // Combinar componentes por defecto con personalizados

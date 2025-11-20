@@ -71,12 +71,25 @@ export function generateFieldResponsiveCSS(
 ): string {
   const fieldLayout = getFieldLayoutInfo(field);
 
-  if (!fieldLayout?.colSpan || typeof fieldLayout.colSpan !== "object") {
+  if (!fieldLayout?.colSpan) {
     return "";
   }
 
   const colSpan = fieldLayout.colSpan;
   let css = "";
+
+  // Si colSpan es un número simple, generar CSS básico
+  if (typeof colSpan === "number") {
+    css += `.${className} {
+  grid-column: span ${colSpan};
+}\n`;
+    return css;
+  }
+
+  // Si colSpan no es un objeto, no generar CSS
+  if (typeof colSpan !== "object") {
+    return "";
+  }
 
   // Breakpoints in mobile-first order
   const breakpoints = {

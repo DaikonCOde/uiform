@@ -62,6 +62,8 @@ export function RadioField({
 
   if (!isVisible) return null
 
+  const {type, jsonType, _rootLayout, errorMessage, getFormValues,...filteredAntdProps} = antdProps
+
   const radioProps = {
     value: value,
     onChange: handleChange,
@@ -73,7 +75,7 @@ export function RadioField({
     'aria-invalid': !!error,
     'aria-describedby': error ? `${name}-error` : undefined,
     'aria-required': required,
-    ...antdProps
+    ...filteredAntdProps
   }
 
   return (

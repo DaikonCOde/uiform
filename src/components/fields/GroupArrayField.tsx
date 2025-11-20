@@ -124,9 +124,9 @@ export function GroupArrayField({
                     {canRemove && !disabled && (
                       confirmDelete ? (
                         <Popconfirm
-                          title="Are you sure you want to delete this item?"
+                          title="¿Está seguro que desea eliminar este ítem?"
                           onConfirm={() => handleRemoveItem(index)}
-                          okText="Yes"
+                          okText="Si"
                           cancelText="No"
                         >
                           <Button 
@@ -208,14 +208,14 @@ export function GroupArrayField({
         )}
         
         {/* Mostrar información de límites */}
-        {(minItems > 0 || maxItems) && (
+        {/* {(minItems > 0 || maxItems) && (
           <div className={styles.arrayLimits}>
             {minItems > 0 && `Min: ${minItems}`}
             {minItems > 0 && maxItems && ' • '}
             {maxItems && `Max: ${maxItems}`}
             {' • '}Current: {arrayValue.length}
           </div>
-        )}
+        )} */}
       </div>
     </div>
   )

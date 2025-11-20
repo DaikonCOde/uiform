@@ -53,6 +53,8 @@ export function NumberField({
     precision: precision ?? 2,
   } : {}
 
+  const {type, jsonType, _rootLayout, errorMessage, getFormValues,...filteredAntdProps} = antdProps
+
   const inputProps = {
     id: name,
     value: typeof value === 'number' ? value : value === null || value === undefined ? undefined : Number(value),
@@ -70,7 +72,7 @@ export function NumberField({
     'aria-required': required,
     style: { width: '100%' },
     ...moneyConfig,
-    ...antdProps
+    ...filteredAntdProps
   }
 
   return (

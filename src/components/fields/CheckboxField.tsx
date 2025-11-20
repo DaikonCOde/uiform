@@ -58,6 +58,8 @@ export function CheckboxField({
     ? value === checkboxValue 
     : Boolean(value)
 
+  const {type, jsonType, _rootLayout, errorMessage, getFormValues,...filteredAntdProps} = antdProps
+
   const checkboxProps = {
     id: name,
     checked: isChecked,
@@ -69,7 +71,7 @@ export function CheckboxField({
     'aria-invalid': !!error,
     'aria-describedby': error ? `${name}-error` : undefined,
     'aria-required': required,
-    ...antdProps
+    ...filteredAntdProps
   }
 
   // Para checkboxes, el label puede ser parte del children o separado
