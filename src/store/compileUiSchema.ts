@@ -1,0 +1,98 @@
+// Compila el uiSchema (RJSF) a x-jsf-* y lo mergea sobre un clon del schema interno del motor.
+// Única vía pública de presentación: el consumidor escribe schema + uiSchema, nunca x-jsf-* a mano. (ARCHITECTURE_V2.md §1 ter)
+
+import type { JsfObjectSchema } from "@laus/json-schema-form";
+import type { UiSchema, UiFieldOptions, UiSection } from "./types";
+
+/**
+ * Compila un uiSchema (RJSF) bajándolo a x-jsf-* sobre un clon del schema.
+ * @param schema  JSON Schema puro (contrato de datos). Nunca se muta.
+ * @param uiSchema  Documento de presentación (ui:*). Si falta, se devuelve el clon tal cual.
+ * @returns Clon del schema con x-jsf-presentation / x-jsf-order / x-jsf-sections listos para createHeadlessForm.
+ */
+export function compileUiSchema(
+  schema: JsfObjectSchema,
+  uiSchema?: UiSchema,
+): JsfObjectSchema {
+  // Clon profundo: la inmutabilidad del input es invariante del compilador. (ARCHITECTURE_V2.md §1 ter, decisión #1)
+  const out = structuredClone(schema);
+
+  if (!uiSchema || Object.keys(uiSchema).length === 0) return out;
+
+  // Raíz: secciones y orden son presentación pura → viven en el uiSchema y bajan a x-jsf-*. (§1 ter, decisión #2)
+  if (uiSchema["ui:sections"] !== undefined) {
+    // x-jsf-sections es desconocido para el motor (lo ignora); lo lee luego resolveSections (§6).
+    (out as Record<string, unknown>)["x-jsf-sections"] =
+      uiSchema["ui:sections"] as UiSection[];
+  }
+  if (uiSchema["ui:order"] !== undefined) {
+    out["x-jsf-order"] = uiSchema["ui:order"] as string[];
+  }
+
+  const properties = out.properties;
+
+  // Por campo: cada clave no-raíz del uiSchema debe corresponder a una property del schema.
+  for (const key of Object.keys(uiSchema)) {
+    if (key === "ui:sections" || key === "ui:order") continue;
+
+    if (!properties || !(key in properties)) {
+      // Robustez: referencia colgada → avisar y seguir, nunca romper el compilado. (§1 ter robustez)
+      console.warn(
+        `[compileUiSchema] uiSchema referencia "${key}", que no existe en schema.properties. Se ignora.`,
+      );
+      continue;
+    }
+
+    const fieldUi = uiSchema[key] as UiFieldOptions | undefined;
+    if (!fieldUi) continue;
+
+    compileField(properties[key] as JsfObjectSchema, fieldUi);
+  }
+
+  return out;
+}
+
+/** Baja las claves ui:* de un campo a su x-jsf-presentation (con uiSchema teniendo precedencia) y recurse en fieldsets. */
+function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
+  // El motor splatea TODO x-jsf-presentation sobre el field → metemos acá toda la presentación. (§1 ter)
+  const presentation: Record<string, unknown> = {
+    ...(prop["x-jsf-presentation"] ?? {}),
+  };
+
+  if (ui["ui:widget"] !== undefined) presentation.inputType = ui["ui:widget"];
+  if (ui["ui:placeholder"] !== undefined) presentation.placeholder = ui["ui:placeholder"];
+  if (ui["ui:autofocus"] !== undefined) presentation.autofocus = ui["ui:autofocus"];
+  if (ui["ui:disabled"] !== undefined) presentation.disabled = ui["ui:disabled"];
+  if (ui["ui:description"] !== undefined) presentation.description = ui["ui:description"];
+
+  // ui:options.* se splatea clave por clave (accept, maxFileSize, asyncOptions, multiple, …). (§1 ter tabla de mapeo)
+  if (ui["ui:options"]) {
+    for (const [k, v] of Object.entries(ui["ui:options"])) {
+      presentation[k] = v;
+    }
+  }
+
+  if (Object.keys(presentation).length > 0) {
+    prop["x-jsf-presentation"] = presentation;
+  }
+
+  // ui:title sobreescribe el label (semántica RJSF) → mapea al title de la property, no a presentation.
+  if (ui["ui:title"] !== undefined) prop.title = ui["ui:title"];
+
+  // ui:order ordena los hijos de un fieldset → x-jsf-order de la property objeto.
+  if (ui["ui:order"] !== undefined) prop["x-jsf-order"] = ui["ui:order"];
+
+  // Recursión en fieldsets: las claves no-ui:* del entry son names de hijos con sus propias UiFieldOptions. (§1 ter punto 3)
+  const childProps = prop.properties;
+  if (childProps) {
+    for (const childKey of Object.keys(ui)) {
+      if (childKey.startsWith("ui:")) continue;
+      if (!(childKey in childProps)) continue; // hijo desconocido: lo ignoramos silenciosamente (igual que RJSF)
+
+      const childUi = ui[childKey] as UiFieldOptions | undefined;
+      if (childUi && typeof childUi === "object") {
+        compileField(childProps[childKey] as JsfObjectSchema, childUi);
+      }
+    }
+  }
+}
