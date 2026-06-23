@@ -28,25 +28,48 @@ Las piezas puras (paths, resolveSections, compileUiSchema para objetos) eran só
 
 ---
 
-## 🔲 Diferido (próxima iteración — con la Fase 5+)
+## ✅ Resuelto en la última iteración (todos los diferidos + hallazgos del browser)
 
-| Sev | Dónde | Issue | Fix sugerido |
-|-----|-------|-------|--------------|
-| 🟠 | `Field.tsx` + todos los `fields/*` | El **prop-stripping no se eliminó**, solo se relocalizó y es inconsistente (cada componente strippea a mano). El doc §1 decía eliminarlo | Centralizar `omitEngineProps(field)` en el controlador → presentacionales reciben `FieldComponentProps` limpio |
-| 🟠 | `SelectField` vs `AutocompleteField` | Dos mecanismos async DISTINTOS (Select usa store, Autocomplete usa loader inyectado en local state). Loader inexistente = silencio (sin warning) | Unificar Autocomplete sobre `useAsyncOptions`; dev-warning si `asyncOptions.id` no resuelve loader |
-| 🟠 | `createFormStore` setValue | `onChange(json, errors)` entrega `errors` STALE salvo `validateTrigger:'onChange'` | Documentar el contrato, o recomputar errores antes de `onChange` |
-| 🟠 | `useField.ts:31-33` | Error anidado (fieldset/array) es ref nueva en cada `validate()` → esos `<Field>` re-renderizan en cada validación | Igualdad por valor del slice de error, o normalizar a primitivo |
-| 🟡 | `SelectField:84-92` | Búsqueda async que devuelve 0 resultados cae a opciones estáticas (no muestra "sin resultados") | Ramificar por `hasAsyncOptions` solo; `notFoundContent` para el vacío |
-| 🟡 | `CheckboxField` | Checkbox con `checkboxValue` emite `null` al destildar → puede romper validación de `boolean` requerido | Emitir `undefined`/`false` según tipo del schema |
-| 🟡 | `GroupArrayField:106` | React key desde `item.id` editable por el usuario → remonta fila al editar | key sintética estable generada al agregar |
-| 🔵 | `test/components/` | **Sin cobertura de contenedores** (fieldset/group-array) — el código más riesgoso | Test vertical-slice con fieldset (text+select) y group-array |
-| 🔵 | `compileUiSchema` / `resolveSections` | `as UiSection[]` sin validar shape → sección sin `fields` rompería | Guardar contra `ui:sections` malformado |
+| Sev | Dónde | Issue | Cómo se resolvió |
+|-----|-------|-------|------------------|
+| 🟠 | `Field.tsx` | prop-stripping disperso e inconsistente | `omitEngineProps()` centralizado en el controlador (un solo punto de strip) |
+| 🟠 | Select vs Autocomplete | dos mecanismos async distintos | `AutocompleteField` migrado a `useAsyncOptions` (sin `StableAutocomplete`); warning dev si el `loaderId` no resuelve |
+| 🟠 | `createFormStore` setValue | `onChange(errors)` stale | contrato documentado + tests (frescos con `validateTrigger:'onChange'`) |
+| 🟠 | `useField` | error anidado re-renderiza en cada validate | equalityFn custom: `error` se compara por VALOR (deepEqual liviano) |
+| 🟡 | `SelectField` | búsqueda vacía caía a opciones estáticas | `source` ramifica por `hasAsyncOptions` solo; `notFoundContent` para el vacío |
+| 🟡 | `CheckboxField` | destildar emitía `null`/`undefined` | boolean → `false`; value-checkbox (const no-bool) → `undefined`. Detección por `typeof checkboxValue` |
+| 🟡 | `GroupArrayField` | React key desde campo editable | uid sintético interno generado al agregar |
+| 🔵 | `test/components/containers.test.tsx` | sin cobertura de contenedores | 15 tests (fieldset + group-array: round-trip anidado, add/remove, falsy, key estable) |
+| 🔵 | `resolveSections` | `ui:sections` malformado rompía | guard `Array.isArray(fields)` + warn |
+
+### Hallazgos extra que cazó el browser (no estaban en la revisión estática)
+
+| Sev | Dónde | Issue | Fix |
+|-----|-------|-------|-----|
+| 🟠 | `Field.tsx` | `getFormValues` quedó MUERTO tras migrar Autocomplete, pero el controlador lo pasaba a todos → leak al DOM (`FieldsetField`) | eliminado del controlador (kill en el origen) |
+| 🟡 | `Field.tsx` | el motor inyecta `nameKey` en fields de items de array → leak al input | agregado a `ENGINE_ONLY_PROPS` |
 
 ---
 
-## Notas de verificación
+## ✅ Verificación funcional en browser (Playwright headless contra el dev server)
 
-- **Demo** (`src/App.tsx`): schema + uiSchema (con `ui:sections` + async select) → compilador → store →
-  `<Field>`. Corré `npm run dev` (localhost:5173) para verlo. Bootea OK, HTTP 200, transpila sin errores.
-- El controlador **SÍ cablea bien los hijos de contenedores** (era una sospecha de la revisión, descartada):
-  el container arma `nestedField` con value/onChange/name prefijado y `renderField` lo renderiza controlado.
+Demo `src/App.tsx` extendido con las 3 secciones (datos / extra / contenedores) cubriendo TODOS los
+tipos de campo. Cada funcionalidad probada manejando el browser real:
+
+| Funcionalidad | Resultado |
+|---|---|
+| Render + 3 secciones (desde `ui:sections`) | ✅ |
+| text / email / number (numérico) / textarea | ✅ |
+| select async (carga diferida + selección) | ✅ |
+| autocomplete searchable (busca server-side + selección) | ✅ |
+| checkbox (tildar→`true`, destildar→`false`, NO null) | ✅ |
+| fieldset → objeto anidado en el store | ✅ |
+| group-array → add item + array anidado | ✅ |
+| submit válido → `onSubmit` con payload completo | ✅ |
+| reset → limpia values | ✅ |
+| validación (submit vacío → errores de requeridos) | ✅ |
+| **consola del browser** | ✅ limpia (cero errores/warnings) |
+
+> Estado: las Fases 1-4 están **completamente funcionales y verificadas end-to-end**. Quedan para la
+> próxima iteración las Fases 5-7 (FormSection/useSection componibles, UIForm v2 + SubmitButton +
+> responsive SSR-safe, DROP del v1 y exports públicos).
