@@ -18,12 +18,17 @@ import { useFormContext } from "../../hooks/useFormContext";
 import type { UIFormProps } from "../../types";
 import styles from "./UIForm.module.css";
 
+// Referencias estables para los defaults. Si usáramos `= {}` en los parámetros, cada render
+// crearía un objeto nuevo, invalidando el useMemo de createHeadlessForm (que recreaba `fields`
+// y disparaba el efecto que reseteaba el formulario). Con una referencia fija eso no pasa.
+const EMPTY_OBJECT: Record<string, any> = {};
+
 // Componente interno que usa el contexto
 function UIFormContent({
   schema,
   formId: externalFormId,
-  initialValues = {},
-  asyncLoaders = {},
+  initialValues = EMPTY_OBJECT,
+  asyncLoaders = EMPTY_OBJECT,
   onSubmit,
   onChange,
   config = {},
@@ -64,6 +69,13 @@ function UIFormContent({
     disabled = false,
   } = config;
 
+  // Clave estable por VALOR: evita re-parsear el schema en cada render cuando `schema` o
+  // `initialValues` llegan como literales nuevos (otra referencia, mismo contenido).
+  const headlessFormKey = useMemo(
+    () => JSON.stringify({ schema, initialValues }),
+    [schema, initialValues]
+  );
+
   // Crear formulario headless con json-schema-form
   const {
     fields,
@@ -90,7 +102,10 @@ function UIFormContent({
         layout: null,
       };
     }
-  }, [schema, initialValues, asyncLoaders]);
+    // Dependemos de headlessFormKey (schema+initialValues por valor). `asyncLoaders` debe
+    // venir memoizado por el caller (ver UIForm-demo / docs).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [headlessFormKey, asyncLoaders]);
 
   // Estados del formulario
   const [values, setValues] = useState<Record<string, any>>(() =>
@@ -232,13 +247,17 @@ function UIFormContent({
     setContextFormValues(values);
   }, [values, setContextFormValues]);
 
-  // Actualizar cuando cambian initialValues (después del montaje inicial)
+  // Re-aplicar valores SOLO cuando initialValues cambia por VALOR (p. ej. un form de edición
+  // que carga datos async después del montaje). Antes este efecto corría en casi todos los
+  // renders (initialValues y fields eran referencias nuevas) y pisaba lo que el usuario tipeaba.
+  const initialValuesKey = useMemo(() => JSON.stringify(initialValues), [initialValues]);
+  const appliedInitialValuesKey = useRef(initialValuesKey);
   useEffect(() => {
-    if (Object.keys(initialValues).length > 0) {
-      const newValues = getDefaultValuesFromFields(fields, initialValues);
-      setValues(newValues);
-    }
-  }, [initialValues, fields]);
+    if (appliedInitialValuesKey.current === initialValuesKey) return;
+    appliedInitialValuesKey.current = initialValuesKey;
+    setValues(getDefaultValuesFromFields(fields, initialValues));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValuesKey]);
 
   // Si hay error en la inicialización, mostrar mensaje
   if (isError) {

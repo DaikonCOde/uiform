@@ -10,6 +10,9 @@ import { ErrorMessage, FieldLabel } from "../commons";
 import type { AutocompleteFieldProps } from "../../types";
 import styles from "./Field.module.css";
 
+// Referencia estable para "sin opciones": evita crear un array nuevo por render.
+const EMPTY_OPTIONS: any[] = [];
+
 // Wrapper interno simplificado - ya no necesita workaround de focus
 const StableAutocomplete = React.memo(({
   inputValue,
@@ -61,15 +64,24 @@ const StableAutocomplete = React.memo(({
     />
   );
 }, (prevProps, nextProps) => {
-  // Solo re-renderizar si props críticas cambian
+  // Re-renderizar si cambia cualquier prop que afecte el render. Las opciones se comparan por
+  // REFERENCIA (autocompleteOptions es estable por contenido vía useMemo), no por `length`
+  // (que se comía cambios de contenido con la misma cantidad). Incluimos isTouched/submitted
+  // porque el status de error depende de ellos.
   return (
     prevProps.inputValue === nextProps.inputValue &&
     prevProps.disabled === nextProps.disabled &&
     prevProps.loading === nextProps.loading &&
     prevProps.error === nextProps.error &&
     prevProps.asyncError === nextProps.asyncError &&
+    prevProps.isTouched === nextProps.isTouched &&
+    prevProps.submitted === nextProps.submitted &&
+    prevProps.required === nextProps.required &&
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.allowClear === nextProps.allowClear &&
+    prevProps.isSearchable === nextProps.isSearchable &&
     prevProps.name === nextProps.name &&
-    prevProps.autocompleteOptions?.length === nextProps.autocompleteOptions?.length
+    prevProps.autocompleteOptions === nextProps.autocompleteOptions
   );
 });
 
@@ -121,8 +133,6 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   // Actualizar refs en cada render
   useEffect(() => {
     asyncOptionsRef.current = asyncOptions;
-    console.log({asyncOptions})
-
   }, [asyncOptions]);
 
   // Cargar opciones async al montar (si no es searchable)
@@ -216,7 +226,6 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   // Handler para búsqueda en async options
   const handleSearch = useCallback(
     async (searchValue: string) => {
-      console.log({searchValue})
       // Usar ref para obtener la configuración async más actual
       const asyncConfig = asyncOptionsRef.current;
 
@@ -287,52 +296,28 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     onBlur?.(name);
   }, [name, onBlur, internalTouched]);
 
-  // Ref para mantener opciones estables mientras se escribe
-  const optionsRef = useRef<any[]>([]);
-  
-  // Determinar las opciones a usar
+  // Determinar las opciones a usar (useMemo PURO: no muta refs adentro).
   const autocompleteOptions = useMemo(() => {
-    let newOptions: any[] = [];
+    const source =
+      hasAsyncOptions && internalOptions.length > 0
+        ? internalOptions
+        : Array.isArray(options)
+        ? options
+        : null;
 
-    // Si tiene async options, usar las internas
-    if (hasAsyncOptions && internalOptions.length > 0) {
-      newOptions = internalOptions.map((option: any) => {
-        if (typeof option === "object" && option !== null) {
-          return {
-            label: option.label || option.title || String(option.value),
-            value: option.value,
-            disabled: option.disabled,
-            ...option,
-          };
-        }
+    if (!source) return EMPTY_OPTIONS;
+
+    return source.map((option: any) => {
+      if (typeof option === "object" && option !== null) {
         return {
-          label: String(option),
-          value: option,
+          label: option.label || option.title || String(option.value),
+          value: option.value,
+          disabled: option.disabled,
+          ...option,
         };
-      });
-    } else if (options && Array.isArray(options)) {
-      newOptions = options.map((option: any) => {
-        if (typeof option === "object" && option !== null) {
-          return {
-            label: option.label || option.title || String(option.value),
-            value: option.value,
-            disabled: option.disabled,
-            ...option,
-          };
-        }
-        return {
-          label: String(option),
-          value: String(option),
-        };
-      });
-    }
-
-    // Solo actualizar si realmente cambiaron
-    if (JSON.stringify(newOptions) !== JSON.stringify(optionsRef.current)) {
-      optionsRef.current = newOptions;
-    }
-
-    return optionsRef.current;
+      }
+      return { label: String(option), value: option };
+    });
   }, [options, hasAsyncOptions, internalOptions]);
 
   // Memoizar las props del AutoComplete para evitar re-creación innecesaria
