@@ -75,12 +75,12 @@ describe("compileUiSchema", () => {
       expect(presentationOf(out, "name").placeholder).toBe("Escribí acá");
     });
 
-    it("ui:autofocus → x-jsf-presentation.autofocus", () => {
+    it("ui:autofocus → x-jsf-presentation.autoFocus (camelCase para React)", () => {
       const out = compileUiSchema(baseSchema(), {
         name: { "ui:autofocus": true },
       } as UiSchema);
 
-      expect(presentationOf(out, "name").autofocus).toBe(true);
+      expect(presentationOf(out, "name").autoFocus).toBe(true);
     });
 
     it("ui:disabled → x-jsf-presentation.disabled", () => {

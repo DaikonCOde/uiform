@@ -69,7 +69,8 @@ function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
 
   if (ui["ui:widget"] !== undefined) presentation.inputType = ui["ui:widget"];
   if (ui["ui:placeholder"] !== undefined) presentation.placeholder = ui["ui:placeholder"];
-  if (ui["ui:autofocus"] !== undefined) presentation.autofocus = ui["ui:autofocus"];
+  // React usa `autoFocus` (camelCase); el field se splatea como prop → debe ir camelCase. (fix de revisión)
+  if (ui["ui:autofocus"] !== undefined) presentation.autoFocus = ui["ui:autofocus"];
   if (ui["ui:disabled"] !== undefined) presentation.disabled = ui["ui:disabled"];
   if (ui["ui:description"] !== undefined) presentation.description = ui["ui:description"];
 
