@@ -59,18 +59,19 @@ function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
     ...(prop["x-jsf-presentation"] ?? {}),
   };
 
-  if (ui["ui:widget"] !== undefined) presentation.inputType = ui["ui:widget"];
-  if (ui["ui:placeholder"] !== undefined) presentation.placeholder = ui["ui:placeholder"];
-  if (ui["ui:autofocus"] !== undefined) presentation.autofocus = ui["ui:autofocus"];
-  if (ui["ui:disabled"] !== undefined) presentation.disabled = ui["ui:disabled"];
-  if (ui["ui:description"] !== undefined) presentation.description = ui["ui:description"];
-
-  // ui:options.* se splatea clave por clave (accept, maxFileSize, asyncOptions, multiple, …). (§1 ter tabla de mapeo)
+  // ui:options PRIMERO (escape hatch): las claves dedicadas de abajo tienen precedencia y no se dejan
+  // pisar (p. ej. ui:options.inputType no puede sobrescribir a ui:widget). (fix de revisión)
   if (ui["ui:options"]) {
     for (const [k, v] of Object.entries(ui["ui:options"])) {
       presentation[k] = v;
     }
   }
+
+  if (ui["ui:widget"] !== undefined) presentation.inputType = ui["ui:widget"];
+  if (ui["ui:placeholder"] !== undefined) presentation.placeholder = ui["ui:placeholder"];
+  if (ui["ui:autofocus"] !== undefined) presentation.autofocus = ui["ui:autofocus"];
+  if (ui["ui:disabled"] !== undefined) presentation.disabled = ui["ui:disabled"];
+  if (ui["ui:description"] !== undefined) presentation.description = ui["ui:description"];
 
   if (Object.keys(presentation).length > 0) {
     prop["x-jsf-presentation"] = presentation;
@@ -82,8 +83,13 @@ function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
   // ui:order ordena los hijos de un fieldset → x-jsf-order de la property objeto.
   if (ui["ui:order"] !== undefined) prop["x-jsf-order"] = ui["ui:order"];
 
-  // Recursión en fieldsets: las claves no-ui:* del entry son names de hijos con sus propias UiFieldOptions. (§1 ter punto 3)
-  const childProps = prop.properties;
+  // Recursión en contenedores: las claves no-ui:* del entry son names de hijos con sus UiFieldOptions. (§1 ter punto 3)
+  // fieldset → prop.properties; group-array → prop.items.properties. (fix de revisión: items de arrays)
+  const childProps =
+    prop.properties ??
+    ((prop as { items?: { properties?: Record<string, unknown> } }).items?.properties as
+      | Record<string, JsfObjectSchema>
+      | undefined);
   if (childProps) {
     for (const childKey of Object.keys(ui)) {
       if (childKey.startsWith("ui:")) continue;

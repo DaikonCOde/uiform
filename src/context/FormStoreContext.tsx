@@ -38,6 +38,31 @@ export function FormProvider({
 }: FormProviderProps) {
   const storeRef = useRef<StoreApi<FormState> | null>(null);
 
+  // Ref viva con las opciones de ESTE render: el store lee a través de ella, así handlers inline
+  // (onSubmit/onChange) y asyncLoaders nuevos no quedan congelados en el closure de creación.
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
+
+  // Opciones ESTABLES (identidad fija) cuyos accesos delegan en la ref viva → el store nunca se
+  // recrea por callbacks nuevos, pero siempre ejecuta el último. (fix: closures stale del Provider)
+  const stableOptsRef = useRef<FormStoreOptions | null>(null);
+  if (!stableOptsRef.current) {
+    stableOptsRef.current = {
+      get initialValues() {
+        return optsRef.current.initialValues;
+      },
+      get config() {
+        return optsRef.current.config;
+      },
+      get asyncLoaders() {
+        return optsRef.current.asyncLoaders;
+      },
+      onSubmit: (json, errors) => optsRef.current.onSubmit?.(json, errors),
+      onChange: (json, errors) => optsRef.current.onChange?.(json, errors),
+    };
+  }
+  const stableOpts = stableOptsRef.current;
+
   // Key por valor: recrear el store solo si schema/uiSchema/initialValues cambian de verdad (no por refs nuevas). (§4, riesgo #3)
   const key = useMemo(
     () => JSON.stringify({ schema, uiSchema, initialValues: opts.initialValues }),
@@ -46,9 +71,9 @@ export function FormProvider({
   const prevKey = useRef(key);
 
   // useRef evita recrear el store en el doble render de StrictMode. (ARCHITECTURE_V2.md riesgo #2)
-  if (!storeRef.current) storeRef.current = createFormStore(schema, uiSchema, opts);
+  if (!storeRef.current) storeRef.current = createFormStore(schema, uiSchema, stableOpts);
   if (prevKey.current !== key) {
-    storeRef.current = createFormStore(schema, uiSchema, opts);
+    storeRef.current = createFormStore(schema, uiSchema, stableOpts);
     prevKey.current = key;
   }
 
@@ -69,6 +94,18 @@ export function useFormStore<T>(
     throw new Error("useFormStore debe usarse dentro de <FormProvider>");
   }
   return useStoreWithEqualityFn(store, selector, eq);
+}
+
+/**
+ * Devuelve la ref CRUDA al store (StoreApi), estable y SIN suscripción.
+ * Para leer valores on-demand sin re-renderizar (p. ej. getFormValues en el controlador).
+ */
+export function useFormStoreApi(): StoreApi<FormState> {
+  const store = useContext(FormStoreContext);
+  if (!store) {
+    throw new Error("useFormStoreApi debe usarse dentro de <FormProvider>");
+  }
+  return store;
 }
 
 // Export interno para tests/hooks que necesiten la ref cruda del store. No es API pública.

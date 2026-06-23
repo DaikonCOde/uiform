@@ -101,7 +101,7 @@ export function SelectField({
   const isSearchable = hasAsyncOptions ? !!searchable : showSearch
 
   // Stripping de props internas del motor (no son props válidas de <Select>). (ARCHITECTURE_V2.md §1 bis)
-  const { jsonType, _rootLayout, errorMessage, getFormValues, ...filteredAntdProps } = antdProps
+  const { type, jsonType, _rootLayout, errorMessage, getFormValues, ...filteredAntdProps } = antdProps
 
   const selectProps = {
     id: name,

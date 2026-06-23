@@ -46,6 +46,10 @@ export function createFormStore(
   // 2) Resolver secciones desde el x-jsf-sections que dejó el compilador. (ARCHITECTURE_V2.md §6)
   const sections = resolveSections(internalSchema, fields);
 
+  // Token de secuencia por loader: descarta respuestas async fuera de orden (la lenta vieja no pisa
+  // a la nueva). Sin esto, dos cargas concurrentes del mismo id ganan por orden de RESOLUCIÓN. (fix de revisión)
+  const loadSeq: Record<string, number> = {};
+
   return createStore<FormState>((set, get) => ({
     // ── Estructura (inmutable tras crear) ──
     fields,
@@ -62,8 +66,8 @@ export function createFormStore(
     async: {},
 
     setValue: (name, value) => {
-      // setPath (no spread directo) para soportar paths anidados clonando solo la rama tocada. (paths.ts)
-      set((s) => ({ values: setPath({ ...s.values }, name, value) }));
+      // setPath clona la raíz y solo la rama tocada (inmutable, preserva refs de hermanos). (paths.ts)
+      set((s) => ({ values: setPath(s.values, name, value) }));
       if (opts.config?.validateTrigger === "onChange") get().validate();
       opts.onChange?.(
         formValuesToJsonValues(get().values, get().fields),
@@ -106,6 +110,8 @@ export function createFormStore(
     loadAsyncOptions: async (loaderId, search = "") => {
       const loader = opts.asyncLoaders?.[loaderId];
       if (!loader) return;
+      // Reservamos un token: solo la respuesta de la ÚLTIMA llamada podrá escribir el resultado.
+      const seq = (loadSeq[loaderId] = (loadSeq[loaderId] ?? 0) + 1);
       // Marcar loading preservando opciones previas para no parpadear la UI mientras recarga. (ARCHITECTURE_V2.md §3.2)
       set((s) => ({
         async: {
@@ -115,6 +121,7 @@ export function createFormStore(
       }));
       try {
         const res = await loader({ formValues: get().values, search });
+        if (seq !== loadSeq[loaderId]) return; // llegó una carga más nueva → descartamos esta.
         set((s) => ({
           async: {
             ...s.async,
@@ -122,6 +129,7 @@ export function createFormStore(
           },
         }));
       } catch (e) {
+        if (seq !== loadSeq[loaderId]) return;
         set((s) => ({
           async: {
             ...s.async,
