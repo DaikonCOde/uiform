@@ -1,908 +1,430 @@
-# UIForm Library - Complete Architecture Documentation
+# UIForm — Documentación técnica de arquitectura
 
-**Version**: 1.0
-**Last Updated**: 2025-11-16
-**Status**: Initial Release - Production Ready
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#executive-summary)
-2. [Architecture Overview](#architecture-overview)
-3. [Data Flow](#data-flow)
-4. [State Management Strategy](#state-management-strategy)
-5. [Component Hierarchy](#component-hierarchy)
-6. [Re-render Optimization](#re-render-optimization)
-7. [Best Practices Comparison](#best-practices-comparison)
-8. [Performance Benchmarks](#performance-benchmarks)
-9. [Architectural Decisions](#architectural-decisions)
-10. [Future Roadmap](#future-roadmap)
+> **Fuente de verdad.** Este documento describe lo que el código **hace realmente**, verificado
+> archivo por archivo contra `src/`. Incluye los bugs y la deuda técnica conocida, sin maquillaje.
+>
+> No contiene benchmarks ni métricas de performance: **el repo no tiene tests ni benchmarks**, así
+> que cualquier número de ese tipo sería inventado. Cuando los haya, se documentan acá con su fuente.
+>
+> Última revisión manual del código: ver `git log`. Si tocás un archivo referenciado acá, actualizá
+> también este documento (las referencias son `archivo:línea`).
 
 ---
 
-## Executive Summary
+## 1. Qué es UIForm (y qué NO es)
 
-UIForm is a **schema-driven form generation library** built on React and Ant Design. It transforms JSON Schema definitions into fully functional, validated forms with minimal boilerplate.
+UIForm es una librería de formularios para React que combina dos capas:
 
-### Core Philosophy
+1. **Capa headless** — [`@laus/json-schema-form`](https://github.com/DaikonCOde/json-schema-form)
+   `@1.2.4` (*"Headless UI form powered by JSON Schemas"*). Parsea el JSON Schema, genera la lista de
+   `fields`, computa el layout y corre la validación. **No renderiza nada.**
+   - **Origen:** es un **fork de `@remoteoss/json-schema-form`** mantenido por el equipo del proyecto
+     (confirmado). El código fuente del motor vive localmente en
+     `/Users/alexocsa/Documents/dev/laus/json-schema-form` (git remote
+     `github.com/DaikonCOde/json-schema-form`) y se publica como `@laus/json-schema-form`
+     (versión instalada: 1.2.4). Conserva la API de `@remoteoss` (`createHeadlessForm`, `modify`,
+     extensiones `x-jsf-*`). **⚠️ Los cambios al motor headless se hacen en ESE repo, no en UIForm.**
+2. **Capa de presentación** — este repo. Mapea cada `field` headless a un componente de
+   **Ant Design**.
 
-- **Declarative Configuration**: Define forms in JSON, not code
-- **Performance First**: Aggressive re-render optimization
-- **Type Safe**: Full TypeScript support
-- **Accessible**: WCAG 2.1 AA compliant
-- **Extensible**: Custom field types and validation
+**Aclaración importante:** UIForm **NO** es `react-jsonschema-form` (rjsf, el de mozilla/rjsf-team).
+Son librerías distintas, con filosofías distintas. Buscar soluciones de "rjsf" en internet no aplica
+acá. El motor real es `@laus/json-schema-form` (ver `package.json:44`).
 
-### Key Metrics
+### Stack real
 
-| Metric | Value |
-|--------|-------|
-| Bundle Size | ~45KB (minified + gzipped) |
-| First Render | <50ms (10 fields) |
-| Re-renders on Input | 1 (isolated field only) |
-| TypeScript Coverage | 100% |
-| Accessibility Score | 95/100 |
+| Capa | Tecnología | Dónde |
+|------|-----------|-------|
+| Parsing de schema + validación | `@laus/json-schema-form` ^1.2.4 | `package.json:44` |
+| Componentes UI | Ant Design ^5 (peer: 4 \|\| 5) | `package.json:34,53` |
+| Estado global | React Context + `useReducer` | `src/context/` |
+| Estado de formulario | `useState` local en `UIFormContent` | `src/components/form/UIForm.tsx` |
+| Layout responsive | CSS Grid generado e inyectado en runtime | `src/utils/responsive-layout.ts` |
+| Tipos | TypeScript ^5.9 | `src/types/` |
 
----
+### Compatibilidad declarada
 
-## Architecture Overview
-
-### High-Level Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        JSON Schema                           │
-│  (Declarative form definition with validation rules)        │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│              @remoteoss/json-schema-form                     │
-│          (Headless form logic - parsing & validation)       │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ↓ Field Definitions Array
-┌─────────────────────────────────────────────────────────────┐
-│                      UIForm Component                        │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │               FormProvider (Context)                   │  │
-│  │  - formValues: Record<string, any>                    │  │
-│  │  - asyncOptionsCache: Cache                           │  │
-│  │  - getFormValues(): Ref-based getter                  │  │
-│  └───────────────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │              UIFormContent (Orchestrator)              │  │
-│  │  - Local State: values, errors, submitted             │  │
-│  │  - Validation: handleValidation()                     │  │
-│  │  - Callbacks: handleFieldChange(), handleSubmit()     │  │
-│  └───────────────────────────────────────────────────────┘  │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ↓ Field Props
-┌─────────────────────────────────────────────────────────────┐
-│                    Field Components                          │
-│  ┌─────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
-│  │ TextField   │ │ SelectField  │ │ AutocompleteField    │ │
-│  │ - Simple    │ │ - Context    │ │ - Optimized          │ │
-│  │ - Stable    │ │ - Async      │ │ - Local State        │ │
-│  └─────────────┘ └──────────────┘ └──────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Technology Stack
-
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Schema Parsing** | @remoteoss/json-schema-form | Transform JSON Schema to fields |
-| **UI Components** | Ant Design 5.x | Pre-built accessible components |
-| **State Management** | React Context + useReducer | Global form state |
-| **Validation** | JSON Schema + Custom | Schema-based validation |
-| **Styling** | CSS Modules + Dynamic CSS | Responsive layouts |
-| **Type System** | TypeScript 5.x | Type safety |
+`package.json:33-37` declara peer deps `react ^17 || ^18` y `antd ^4 || ^5`. Los tipos de dev
+(`@types/react ^18`) y el código asumen React 18. **No hay test que verifique React 17**; tomar la
+compatibilidad con 17 como "declarada, no verificada".
 
 ---
 
-## Data Flow
+## 2. Puntos de entrada y exports
 
-### Complete User Interaction Flow
+`src/lib/index.ts` es el barrel público. Exporta:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Types in Field                       │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│           Field Component (e.g., TextField)                  │
-│  handleChange(e) → onChange(name, value)                     │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│              UIForm.handleFieldChange()                      │
-│  1. setValues({ ...prevValues, [name]: value })             │
-│  2. setContextFormValues(newValues)                          │
-│  3. if (validateTrigger === 'onChange'):                     │
-│     - validateValues(newValues)                              │
-│     - setErrors(validationErrors)                            │
-│     - onChangeCallback(jsonValues, errors)                   │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│                   Re-render Strategy                         │
-│  ✅ Field with new value re-renders                          │
-│  ✅ Fields with new errors re-render                         │
-│  ❌ Unrelated fields DON'T re-render (stable callbacks)      │
-└─────────────────────────────────────────────────────────────┘
-```
+- `UIForm` (named) y `UIFormDefault` (default) — `src/components/form/UIForm.tsx`
+- Todos los tipos de props (`UIFormProps`, `*FieldProps`, `FieldOption`, `AsyncOptionsLoader`, …) — `src/types/types.d.ts`
+- `FormProvider`, `FormContext`, `useFormContext` y tipos del contexto — `src/context/`
+- Utils: `formValuesToJsonValues`, `getDefaultValuesFromFields` — `src/utils/utils.ts`
+- Todos los componentes de campo (para customización avanzada) — `src/components/fields/`
+- Re-export de tipos del motor: `Field`, `JsfObjectSchema`, `AsyncOptionsConfig`, etc. — desde `@laus/json-schema-form`
 
-### Async Options Loading Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│        AutocompleteField (Searchable) Interaction            │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-      User types "cal" in autocomplete
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│              handleSearch("cal") triggered                   │
-│  1. setLoading(true) [LOCAL STATE]                           │
-│  2. Get current form values: getFormValues()                 │
-│  3. Call asyncLoader({ search: "cal", formValues })          │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  Async Loader Function                       │
-│  const loader = async ({ search, formValues }) => {         │
-│    const results = await api.search(search)                 │
-│    return { options: results }                              │
-│  }                                                           │
-└────────────────────┬────────────────────────────────────────┘
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│           AutocompleteField receives options                 │
-│  1. setInternalOptions(results) [LOCAL STATE]                │
-│  2. setLoading(false)                                        │
-│  3. Component re-renders ITSELF only                         │
-│  4. Dropdown shows filtered results                          │
-└─────────────────────────────────────────────────────────────┘
-                     ↓
-      User selects "California"
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│              handleSelect("california") called               │
-│  1. setInputValue("California") [LOCAL STATE]                │
-│  2. onChange(name, "california") → UIForm                    │
-│  3. Form value updated in global state                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Key Insight**: Autocomplete loading happens in **local state**, preventing UIForm and sibling fields from re-rendering.
+El CSS se importa aparte: `import '@laus/uiform/dist/style.css'` (`package.json:15`).
 
 ---
 
-## State Management Strategy
-
-### State Ownership Decision Tree
+## 3. Diagrama de capas (real)
 
 ```
-                    Is this state needed?
-                           │
-         ┌─────────────────┴─────────────────┐
-         ↓                                     ↓
-   By multiple fields?                  By single field?
-         │                                     │
-    ┌────┴────┐                          ┌────┴────┐
-    ↓         ↓                          ↓         ↓
-Globally?  Between                   UI State?  Field Value?
-           siblings?                      │          │
-    │         │                           ↓          ↓
-    ↓         ↓                      Local State  Props from
-Context    Lift to                   (inputValue)  UIForm
-(formValues) UIForm                                 (value)
-           (values)
+JSON Schema
+   │
+   ▼
+createHeadlessForm(schema, opts)        ← @laus/json-schema-form
+   │  devuelve: { fields, handleValidation, isError, error, layout }
+   ▼
+UIForm                                   ← wrapper: monta <FormProvider>
+   └─ FormProvider (Context)             ← src/context/FormContext.tsx
+        - formValues, asyncOptionsCache  ← useReducer (src/context/reduce.ts)
+        - getFormValues() (ref-based)
+        └─ UIFormContent                 ← orquestador (estado real del form)
+             - values, errors, submitted, isSubmitting (useState)
+             - useResponsiveCSS()        ← inyecta CSS grid
+             - useFieldRenderer()        ← mapea inputType → componente
+             └─ fields.map() → <Form.Item> → renderField(field)
+                  └─ TextField / SelectField / AutocompleteField / ... (Ant Design)
 ```
 
-### State Layers
+---
 
-#### Layer 1: UIForm Local State (Source of Truth)
+## 4. Componente principal: `UIForm` / `UIFormContent`
+
+Archivo: `src/components/form/UIForm.tsx`
+
+### Estructura
+
+- `UIForm` (`:348`) es un wrapper mínimo: envuelve `UIFormContent` en `<FormProvider>` pasándole
+  `initialValues`.
+- `UIFormContent` (`:22`) tiene toda la lógica.
+
+### Ciclo de un cambio de campo (lo que pasa de verdad)
+
+1. El campo llama `onChange(name, value)` → `handleFieldChange` (`:166`).
+2. `handleFieldChange` hace `setValues(prev => ({ ...prev, [name]: value }))`.
+3. Si `validateTrigger === 'onChange'`, dentro del updater dispara un **`setTimeout(…, 0)`**
+   (`:177`) que llama `validateValues(newValues)` y luego `onChange` del usuario.
+4. Un `useEffect` separado (`:231`) sincroniza `values` → contexto vía `setContextFormValues(values)`.
+
+> ⚠️ **Ojo:** el `ARCHITECTURE.md` viejo decía que el contexto se actualizaba *dentro* del updater de
+> `setValues`. Es falso. Se hace en un `useEffect` aparte (`:231-233`). Esta doc refleja el código real.
+
+### Validación
+
+`validateValues` (`:140`): `formValuesToJsonValues(values, fields)` → `handleValidation(jsonValues)`
+→ `setErrors(formErrors)`. Devuelve `{ errors, jsonValues }`. Envuelto en try/catch que setea un
+error genérico `{ "": "Validation failed" }`.
+
+### Submit
+
+`handleSubmit` (`:203`): marca `submitted`/`isSubmitting`, valida, **si hay errores no envía**, si no
+llama `onSubmit(jsonValues, errors)`. El botón Submit/Reset por defecto solo se renderiza si hay
+`onSubmit` **y** no hay `children` **y** no hay `formId` externo (`:310`). Si pasás `formId`, se asume
+botón externo vía `<button form={formId}>`.
+
+### Refs estables
+
+`valuesRef`, `onChangeRef`, `validateTriggerRef` (`:110-119`) se actualizan en un `useEffect` **sin
+array de dependencias** (corre en cada render) para que los callbacks accedan a los valores más
+nuevos sin recrearse.
+
+---
+
+## 5. Estado: tres capas
+
+### Capa 1 — Estado local de `UIFormContent` (fuente de verdad real)
+
+`values`, `errors`, `submitted`, `isSubmitting` (`:96-101`). Esto maneja TODO el render de los
+campos. Es la fuente de verdad de los datos del form.
+
+### Capa 2 — `FormContext` (coordinación entre campos)
+
+Archivos: `src/context/FormContext.tsx`, `src/context/reduce.ts`.
+
+`useReducer(formReducer, { formValues, asyncOptionsCache })`. Expone:
+
+| Método | Uso |
+|--------|-----|
+| `updateFormValue(name, value)` | Actualiza un campo. **Expuesto pero NO usado por UIForm** (ver deuda técnica). |
+| `setFormValues(values)` | Reemplaza todo `formValues`. Es lo que usa UIForm para sincronizar. |
+| `getFormValues()` | Getter **ref-based** (`:75`): devuelve `formValuesRef.current` sin suscribir. |
+| `setAsyncOptions` / `getAsyncOptions` | Cache de opciones async (usado por `SelectField`). |
+| `setAsyncLoading` / `isAsyncLoading` | Estado de carga por `loaderId`. |
+| `setAsyncError` / `getAsyncError` | Error por `loaderId`. |
+| `clearAsyncCache(loaderId?)` | Limpia cache (uno o todo). |
+
+El `contextValue` (`FormContext.tsx:82`) incluye `...state` completo en su `useMemo`. **Consecuencia:
+cualquier componente que use `useFormContext()` se re-renderiza ante cualquier cambio de estado del
+contexto.** `SelectField` lo usa directo (se suscribe); `AutocompleteField` deliberadamente NO (usa
+el getter por props).
+
+#### Patrón ref-based getter
+
+Para evitar que componentes que solo *leen ocasionalmente* `formValues` se re-rendericen en cada
+tecla, `FormProvider` mantiene `formValuesRef` (`:28`) actualizado por effect (`:31`), y `getFormValues`
+(`:75`) lo devuelve con deps vacías → referencia estable. `AutocompleteField` recibe `getFormValues`
+por props (no por contexto) para no suscribirse.
+
+#### Reducer (`reduce.ts:46`)
+
+Acciones: `UPDATE_FORM_VALUE`, `SET_FORM_VALUES`, `SET_ASYNC_OPTIONS` (stampa `Date.now()`),
+`SET_ASYNC_LOADING`, `SET_ASYNC_ERROR`, `CLEAR_ASYNC_CACHE`.
+
+### Capa 3 — Estado local de cada campo
+
+Cada campo tiene `internalTouched` para saber si mostrar errores. `AutocompleteField` además tiene
+`inputValue`, `internalOptions`, `loading`, `asyncError` (`AutocompleteField.tsx:101-110`).
+
+---
+
+## 6. Renderizado de campos: `useFieldRenderer`
+
+Archivo: `src/hooks/useFieldRenderer.tsx`
+
+`FIELD_COMPONENT_MAP` (`:18`) mapea `inputType` → componente:
+
+| inputType | Componente |
+|-----------|-----------|
+| `text`, `email`, `hidden` | `TextField` |
+| `number`, `money` | `NumberField` |
+| `textarea` | `TextareaField` |
+| `select`, `country` | `SelectField` |
+| `autocomplete` | `AutocompleteField` |
+| `radio` | `RadioField` |
+| `checkbox` | `CheckboxField` |
+| `date` | `DateField` |
+| `file` | `FileField` |
+| `fieldset` | `FieldsetField` |
+| `group-array` | `GroupArrayField` |
+
+`renderField` (`:63`): busca el componente; si no existe, renderiza una caja de error
+"Unsupported field type". Arma `baseProps` (spread del field + `disabled`/`size` globales). Para
+`fieldset` y `group-array` pasa `renderField` recursivamente (`:96`). Permite override vía
+`customComponents`.
+
+---
+
+## 7. Catálogo de campos
+
+Patrón común de todos: destructuran props → `internalTouched` (estado) → `isTouched = touched ??
+internalTouched` → `handleChange`/`handleBlur` → `if (!isVisible) return null` → filtran props que no
+van al DOM (`jsonType`, `_rootLayout`, `errorMessage`, `getFormValues`, `type`) en `filteredAntdProps`
+→ renderizan `<FieldLabel>` + componente Ant + `<ErrorMessage>` cuando `(isTouched || submitted)`.
+
+| Campo | Archivo | Notas reales |
+|-------|---------|--------------|
+| **TextField** | `TextField.tsx` | `text`/`email`/`hidden`. `hidden` → `<input type=hidden>`. `value \|\| ''`. |
+| **NumberField** | `NumberField.tsx` | Parsea a número o `null`. `money` agrega `formatter`/`parser` con separador de miles y `precision: 2`. |
+| **TextareaField** | `TextareaField.tsx` | `Input.TextArea`, `rows=4`, `autoSize`, `showCount`. |
+| **SelectField** | `SelectField.tsx` | **Se suscribe al contexto** (`useFormContext`). Async vía **cache del contexto**. Soporta `dependencies` (recarga al cambiar). `multiple`. |
+| **AutocompleteField** | `AutocompleteField.tsx` | Async vía **estado local** (no contexto). `getFormValues` por props. Wrapper `StableAutocomplete` con `React.memo`. Ver deuda técnica. |
+| **RadioField** | `RadioField.tsx` | `Radio.Group` vertical con `Space`. |
+| **CheckboxField** | `CheckboxField.tsx` | Soporta `checkboxValue` (valor custom cuando checked, `null` cuando no). Si no, booleano. |
+| **DateField** | `DateField.tsx` | `dayjs` + `customParseFormat`. Parsea varios formatos comunes. Guarda string (`YYYY-MM-DD` o ISO si `showTime`). `disabledDate` por `minDate`/`maxDate`. |
+| **FileField** | `FileField.tsx` | `Upload`/`Dragger`. **No sube automáticamente** (`beforeUpload` devuelve `false`, `customRequest` no-op). Valida `maxFileSize`/`accept`. Mantiene archivos en memoria. |
+| **FieldsetField** | `FieldsetField.tsx` | `Card`. Anida campos con name prefijado `${name}.${field.name}`. Inyecta su propio CSS grid responsive. Mergea cambios anidados. |
+| **GroupArrayField** | `GroupArrayField.tsx` | Lista repetible de `Card`. Add/remove/cambio por índice. `getDefaultValueForType` para items nuevos. `min/maxItems`, `Popconfirm` al borrar. |
+
+### Componentes comunes
+
+- **`FieldLabel`** (`commons/label.tsx`): renderiza label + asterisco si `required` + description.
+  **Devuelve `null` si no hay `label`** (`:21`) → ver deuda técnica.
+- **`ErrorMessage`** (`commons/errorMessage.tsx`): muestra string simple, u objeto de errores
+  (lista de valores). `null` si no hay error.
+
+---
+
+## 8. Sistema de layout responsive
+
+Archivo: `src/utils/responsive-layout.ts`
+
+Breakpoints mobile-first: `sm: 0px`, `md: 768px`, `lg: 1024px`, `xl: 1280px`.
+
+- `generateContainerResponsiveCSS` (`:9`): genera el `display: grid` + `grid-template-columns`
+  responsivo del contenedor a partir de `layout` del schema (`x-jsf-layout`).
+- `generateFieldResponsiveCSS` (`:68`): `grid-column: span N` por campo, usando `getFieldLayoutInfo`
+  del motor (`colSpan` puede ser número u objeto responsivo).
+- `generateFormResponsiveCSS` (`:129`): junta contenedor + todos los campos.
+- `injectResponsiveCSS` (`:162`): crea/reemplaza un `<style id=...>` en `<head>`.
+- `cleanupResponsiveCSS` (`:186`): lo remueve.
+- `generateDirectResponsiveCSS` (`:198`): versión alternativa con `!important` (ver deuda técnica —
+  casi duplicada).
+- **`useResponsiveCSS`** (`:246`): genera el CSS (en cada render, no memoizado), y lo inyecta en un
+  `useEffect` gated por `[css, styleId]`. Limpia al desmontar. Devuelve `containerClassName` y
+  `getFieldClassName(name)`.
+
+`FieldsetField` repite esta lógica internamente para su propio grid (`FieldsetField.tsx:73-103`).
+
+> ⚠️ **Duplicación con el motor.** `@laus/json-schema-form` **ya exporta** generadores de CSS
+> responsive: `generateResponsiveCSS`, `generateResponsiveFieldCSS`, `generateCSSGridProperties`,
+> `getFormContainerLayout`, `getRootLayoutInfo`, `normalizeLayoutConfig`, `DEFAULT_LAYOUT_CONFIG`
+> (verificado en `node_modules/@laus/json-schema-form/dist/index.d.ts`). UIForm **no los usa**: solo
+> importa `getFieldLayoutInfo` y reimplementa toda la generación de CSS a mano en
+> `responsive-layout.ts`. Es deuda técnica: convendría evaluar usar los del motor y borrar la
+> reimplementación.
+
+---
+
+## 9. Async options: DOS patrones distintos (inconsistencia conocida)
+
+| | `SelectField` | `AutocompleteField` |
+|---|---|---|
+| Dónde viven las opciones | **Cache del contexto** (`asyncOptionsCache`) | **Estado local** (`internalOptions`) |
+| Acceso a `formValues` | `useFormContext()` (suscrito) | `getFormValues()` por props (no suscrito) |
+| Re-render al tipear en otro campo | Sí (suscrito al contexto) | No (aislado) |
+| `dependencies` | Sí, recarga al cambiar (`SelectField.tsx:73`) | No implementado igual |
+
+Forma del loader (igual para ambos):
 
 ```typescript
-const [values, setValues] = useState<Record<string, any>>({
-  firstName: "John",
-  lastName: "Doe",
-  email: "john@example.com"
-})
-
-const [errors, setErrors] = useState<Record<string, any>>({
-  email: "Invalid email format"
-})
-
-const [submitted, setSubmitted] = useState(false)
-const [isSubmitting, setIsSubmitting] = useState(false)
-```
-
-**Purpose**:
-- Single source of truth for form data
-- Drives all field rendering
-- Validation results storage
-
-**Why Local?**
-- React's native state is fastest
-- No context overhead
-- Easy to reason about
-
-#### Layer 2: FormContext (Global Coordination)
-
-```typescript
-// Context State
-{
-  formValues: Record<string, any>,        // Synced copy for dependencies
-  asyncOptionsCache: {                    // Cached async results
-    [loaderId: string]: {
-      options: any[],
-      timestamp: number,
-      isLoading: boolean,
-      error: string | null
-    }
+const asyncLoaders: Record<string, AsyncOptionsLoader> = {
+  myLoaderId: async ({ formValues, search }) => {
+    return { options: [/* ... */] }
   }
 }
-
-// Context Methods
-- updateFormValue(name, value)     // Update single field
-- setFormValues(values)            // Bulk update
-- getFormValues()                  // Ref-based getter (no subscription!)
-- setAsyncOptions(id, options)     // Cache async results
-- getAsyncOptions(id)              // Retrieve cached options
-- isAsyncLoading(id)               // Check loading state
 ```
 
-**Purpose**:
-- Coordinate between fields (e.g., country → state dependency)
-- Share async options cache (avoid duplicate API calls)
-- Provide stable getFormValues() for isolated components
+Y en el schema: `x-jsf-presentation.asyncOptions.id` (+ `dependencies?`, `searchable?`).
 
-**Why Context?**
-- Fields need access to other field values (dependencies)
-- Avoid prop drilling through deeply nested components
-- Centralized async cache prevents race conditions
-
-#### Layer 3: Field Local State (UI-Specific)
-
-```typescript
-// AutocompleteField
-const [inputValue, setInputValue] = useState("")        // Display text
-const [internalOptions, setInternalOptions] = useState([])  // Search results
-const [loading, setLoading] = useState(false)           // Loading indicator
-const [asyncError, setAsyncError] = useState(null)      // Error message
-const [internalTouched, setInternalTouched] = useState(false)  // Touch tracking
-```
-
-**Purpose**:
-- Component-specific UI state
-- Prevent parent re-renders
-- Fast, isolated updates
-
-**Why Local?**
-- Typing in autocomplete shouldn't re-render entire form
-- Loading spinners are UI-only, not business logic
-- Touch state is field-specific
-
-### The Ref-Based Getter Pattern
-
-**Problem**: `useContext()` subscribes to ALL context changes.
-
-```typescript
-// ❌ BAD: AutocompleteField subscribes to context
-const { formValues } = useFormContext()  // Re-renders when ANY field changes!
-
-// When user types in unrelated TextField:
-// 1. TextField updates formValues in context
-// 2. Context changes
-// 3. AutocompleteField re-renders (even though it doesn't use the new value!)
-// 4. Input loses focus
-```
-
-**Solution**: Ref-based getter function.
-
-```typescript
-// ✅ GOOD: AutocompleteField receives getter as prop
-function AutocompleteField({ getFormValues, ... }) {
-  // getFormValues is STABLE (doesn't change between renders)
-
-  const handleSearch = useCallback(async (searchValue) => {
-    // Only access formValues when needed
-    const currentFormValues = getFormValues()  // No subscription!
-
-    const result = await asyncLoader({
-      search: searchValue,
-      formValues: currentFormValues
-    })
-
-    setInternalOptions(result.options)  // Local state update
-  }, [getFormValues])
-}
-
-// In FormProvider:
-const formValuesRef = useRef(state.formValues)
-
-useEffect(() => {
-  formValuesRef.current = state.formValues  // Keep ref updated
-}, [state.formValues])
-
-const getFormValues = useCallback(() => {
-  return formValuesRef.current  // Always returns latest without subscription
-}, [])  // Empty deps = stable reference
-```
-
-**Benefits**:
-- ✅ AutocompleteField doesn't subscribe to context
-- ✅ No re-render when other fields change
-- ✅ Focus maintained during typing
-- ✅ Still gets fresh values when needed
+Esta divergencia está reconocida como deuda (ver §11, ADR histórico "Local State for Autocomplete").
 
 ---
 
-## Component Hierarchy
+## 10. Transformación de valores (UI ↔ JSON)
 
-### Component Responsibilities Matrix
+Archivo: `src/utils/utils.ts` + `src/utils/setDeep.ts`
 
-| Component | What It Does | State It Owns | Re-render Triggers |
-|-----------|--------------|---------------|-------------------|
-| **UIForm** | Wrapper, provides context | None | Never (stateless wrapper) |
-| **FormProvider** | Global state container | formValues, asyncOptionsCache | Reducer actions |
-| **UIFormContent** | Form orchestration | values, errors, submitted | State updates, context changes |
-| **TextField** | Text input rendering | internalTouched | value, error, submitted props |
-| **SelectField** | Dropdown with async | internalTouched | value, error, formValues, asyncOptionsCache |
-| **AutocompleteField** | Search input with async | inputValue, internalOptions, loading | value, error (NOT context!) |
-| **NumberField** | Number input | internalTouched | value, error, submitted props |
-| **DateField** | Date picker | internalTouched | value, error, submitted props |
+- `formValuesToJsonValues(values, fields)` (`utils.ts:11`): transforma valores de UI a formato JSON
+  Schema antes de validar/enviar. Omite campos vacíos (`''`) e invisibles (`!isVisible`). Usa
+  `setDeep` para paths anidados.
+- `getDefaultValuesFromFields(fields, initialValues)` (`utils.ts:42`): arma los valores iniciales
+  controlados desde `default` del schema o `initialValues`.
+- `setDeep(obj, path, value)` (`setDeep.ts:5`): asigna en path tipo `"user.name"` o `"items[0].price"`
+  creando objetos/arrays según corresponda.
 
-### Field Component Lifecycle
-
-```typescript
-// Generic Field Lifecycle
-┌──────────────────────────────────────────────────────────┐
-│  1. Mount                                                 │
-│     - Initialize internal state                          │
-│     - If async: load initial options                     │
-│     - Register with form (implicit via props)            │
-├──────────────────────────────────────────────────────────┤
-│  2. User Interaction                                      │
-│     - Update internal state (touch, UI-specific)         │
-│     - Call onChange(name, value) → notify parent         │
-│     - Trigger async operations (if applicable)           │
-├──────────────────────────────────────────────────────────┤
-│  3. Receive New Props                                     │
-│     - value changes → update display                     │
-│     - error changes → show/hide error message            │
-│     - submitted changes → validate display logic         │
-├──────────────────────────────────────────────────────────┤
-│  4. Cleanup                                               │
-│     - Cancel pending async operations                    │
-│     - Clear internal state                               │
-│     - Unregister from form (automatic)                   │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Validation Flow
-
-```
-User Input → Field Component
-                ↓
-         onChange(name, value)
-                ↓
-      UIForm.handleFieldChange()
-                ↓
-    setValues({ ...prev, [name]: value })
-                ↓
-┌───────────────────────────────────────────────────┐
-│  Validation Trigger Check                         │
-│  - onChange: Validate immediately                 │
-│  - onBlur: Validate on field blur                 │
-│  - onSubmit: Validate on submit only              │
-└────────────────┬──────────────────────────────────┘
-                 ↓ (if triggered)
-         validateValues(newValues)
-                 ↓
-┌────────────────────────────────────────────────────┐
-│  formValuesToJsonValues()                          │
-│  Transform form values to JSON Schema format       │
-└────────────────┬───────────────────────────────────┘
-                 ↓
-┌────────────────────────────────────────────────────┐
-│  handleValidation(jsonValues)                      │
-│  Run JSON Schema validation rules                  │
-└────────────────┬───────────────────────────────────┘
-                 ↓
-         { formErrors: {...} }
-                 ↓
-         setErrors(formErrors)
-                 ↓
-      Field re-renders with error message
-```
+> Estas funciones fueron corregidas (recursión para `fieldset`/`group-array` y manejo correcto de
+> falsy values — ver §11.6 y §11.7). El comentario del archivo dice *"These utils will be part of
+> json-schema-form soon"*: siguen pensadas como provisionales hasta migrarlas al motor.
 
 ---
 
-## Re-render Optimization
+## 11. Bugs conocidos y deuda técnica
 
-### Optimization Techniques Employed
+Esta es la sección de mayor valor del documento. Cada ítem está verificado contra el código.
 
-#### 1. Stable Callbacks with Refs
+### 🔴 Críticos — ✅ RESUELTOS (2026-06-22)
 
-**Implementation**:
-```typescript
-// UIForm.tsx
-const valuesRef = useRef(values)
-const onChangeRef = useRef(onChange)
-const validateTriggerRef = useRef(validateTrigger)
+1. **El form se re-parseaba en cada render y reseteaba lo tipeado.** — ✅ **CORREGIDO.**
+   - Causa: `initialValues = {}` / `asyncLoaders = {}` como defaults creaban referencias nuevas cada
+     render → invalidaban el `useMemo` de `createHeadlessForm` → recreaban `fields` → el `useEffect`
+     que re-aplica `initialValues` corría casi siempre y pisaba lo tipeado.
+   - Fix (`UIForm.tsx`): defaults a una constante estable `EMPTY_OBJECT`; el `useMemo` de
+     `createHeadlessForm` ahora depende de `headlessFormKey` (`JSON.stringify({schema, initialValues})`,
+     estable por VALOR) + `asyncLoaders`; el efecto de re-aplicar `initialValues` se gatea por
+     `initialValuesKey` (valor) con un `ref`, así solo corre ante cambios reales (p. ej. un form de
+     edición que carga datos async). `asyncLoaders` debe seguir viniendo memoizado por el caller.
 
-useEffect(() => {
-  valuesRef.current = values
-  onChangeRef.current = onChange
-  validateTriggerRef.current = validateTrigger
-})
+2. **Falsy bugs: `0` y `false` se perdían.** — ✅ **CORREGIDO.**
+   - `utils.ts` (`getDefaultValuesFromFields`): `|| ""` → `?? ""` (respeta `0`/`false`/`""`).
+   - `utils.ts` (`formValuesToJsonValues`): `transform?.(v) || v` → `const transform = …;
+     transform ? transform(v) : v` (un número `0` ya no cae al fallback ni se manda como string).
+   - **Nota:** la implementación real vive en `utils.ts`, NO en `formValuesToJsonValues.ts` — ese
+     archivo estaba **vacío** (stub muerto, nadie lo importaba) y fue **eliminado**.
 
-const handleFieldChange = useCallback((fieldName: string, value: any) => {
-  setValues((prevValues) => {
-    const newValues = { ...prevValues, [fieldName]: value }
-    setContextFormValues(newValues)
+### 🟠 Importantes — ✅ RESUELTOS 3–7 (2026-06-22); ⏸️ 8 diferido
 
-    // Access latest values via refs
-    if (validateTriggerRef.current === 'onChange') {
-      setTimeout(() => {
-        const validation = validateValues(newValues)
-        onChangeRef.current?.(validation.jsonValues, validation.errors)
-      }, 0)
-    }
+3. **`console.log` de debug shippeados.** — ✅ **CORREGIDO.** Eliminados de `AutocompleteField`
+   (estaban en el effect de `asyncOptions` y en `handleSearch`). Los `console.error` de `UIForm`
+   (errores reales) se conservan.
 
-    return newValues
-  })
-}, [validateValues, setContextFormValues])  // Only stable dependencies!
-```
+4. **`React.memo` del Autocomplete comía cambios.** — ✅ **CORREGIDO.** El comparador de
+   `StableAutocomplete` ya no compara por `length`: compara `autocompleteOptions` por referencia
+   (estable por contenido vía useMemo, ver #5) e incluye `isTouched`/`submitted`/`required`/
+   `placeholder`/`allowClear`/`isSearchable` (de los que dependen el render y el `status="error"`).
 
-**Why It Works**:
-- `handleFieldChange` reference never changes
-- Props passed to children stay stable
-- React.memo can skip re-renders
-- But refs ensure we always access latest values
+5. **`useMemo` impuro.** — ✅ **CORREGIDO.** `autocompleteOptions` ahora es un `useMemo` PURO (sin
+   mutar refs adentro); se eliminó `optionsRef`. Devuelve una constante estable `EMPTY_OPTIONS` cuando
+   no hay opciones.
 
-#### 2. React.memo on Field Components
+6. **`formValuesToJsonValues` incompleto.** — ✅ **CORREGIDO.** Reescrito con recursión
+   (`transformFieldValue`): maneja `fieldset` (objeto anidado) y `group-array` (array de objetos),
+   agrega `money`, y omite hojas `null`/`undefined`/`""` (esto último también arregla que un número
+   vacío se enviara como `0`). Conserva el comportamiento de los forms planos.
 
-```typescript
-export const AutocompleteField = React.memo(function AutocompleteField({
-  name,
-  value,
-  error,
-  submitted,
-  onChange,
-  onBlur,
-  getFormValues,
-  ...props
-}: AutocompleteFieldProps) {
-  // Component implementation
-})
-```
+7. **`getDefaultValuesFromFields` sin recursión.** — ✅ **CORREGIDO.** Arma defaults anidados para
+   `fieldset` (objeto) y `group-array` (array de items), manteniendo `??` para valores falsy.
 
-**Comparison Function** (optional):
-```typescript
-export const AutocompleteField = React.memo(
-  function AutocompleteField({...}) { ... },
-  (prevProps, nextProps) => {
-    // Return true if props are "equal" (skip re-render)
-    return (
-      prevProps.value === nextProps.value &&
-      prevProps.error === nextProps.error &&
-      prevProps.submitted === nextProps.submitted &&
-      prevProps.name === nextProps.name
-      // onChange, onBlur are stable (don't check)
-    )
-  }
-)
-```
+8. **`SelectField` se suscribe a todo el contexto.** — ⏸️ **DIFERIDO (no es un fix seguro y rápido).**
+   `useFormContext()` + `contextValue` con `...state` hace que cualquier cambio re-renderice todos los
+   `SelectField`. Pero `SelectField` **necesita** `formValues` (para `dependencies`), así que no se
+   puede "desuscribir" sin más. El fix correcto es suscripción por selector
+   (`use-context-selector` / Zustand) o partir el contexto en dos — un cambio arquitectónico que
+   conviene hacer **con tests de re-render primero**, no a ciegas. Queda como deuda consciente.
 
-#### 3. Local State Isolation
+### 🟡 Menores / deuda
 
-**AutocompleteField Strategy**:
-```typescript
-// Local state for async operations
-const [internalOptions, setInternalOptions] = useState<any[]>([])
-const [loading, setLoading] = useState(false)
-const [asyncError, setAsyncError] = useState<string | null>(null)
+9. **`setTimeout(…, 0)` para validar** (`UIForm.tsx:177`) sin cleanup: frágil, propenso a closures
+   viejos y races; no se cancela al desmontar.
 
-const handleSearch = useCallback(async (searchValue: string) => {
-  setLoading(true)  // ← Local state update
+10. **`formId` con `Math.random()` + `substr`** (`UIForm.tsx:105`; ídem `FieldsetField.tsx:40`):
+    `substr` está deprecado y `Math.random` rompe hidratación en SSR. Usar `useId()` de React.
 
-  try {
-    const result = await asyncLoader({ search: searchValue, formValues: getFormValues() })
-    setInternalOptions(result.options)  // ← Local state update
-  } catch (err) {
-    setAsyncError(err.message)  // ← Local state update
-  } finally {
-    setLoading(false)  // ← Local state update
-  }
-}, [getFormValues])
-```
+11. **`allowReorder` es cosmético** en `GroupArrayField` (`:118`): muestra el ícono de drag pero **no
+    hay lógica de reordenamiento**. Feature muerta o a implementar.
 
-**Impact**:
-```
-Before (context-based):
-  User types → Context updates → UIForm re-renders → All fields re-render → 100+ components
+12. **`FileField`: comentario vs realidad.** Habla de "convertir a base64" (`:55`) pero no convierte;
+    mantiene los archivos en memoria. `customRequest` por defecto es no-op.
 
-After (local state):
-  User types → Local state updates → AutocompleteField re-renders → 1 component
-```
+13. **`FieldLabel` devuelve `null` si no hay `label`** (`label.tsx:21`): un campo `required` sin
+    `label` no muestra asterisco ni contenedor de label.
 
-#### 4. useMemo for Expensive Computations
+14. **CSS responsive reimplementado + duplicado internamente.** Dos problemas en capas:
+    (a) `responsive-layout.ts` reimplementa generadores de CSS que **el motor ya exporta**
+    (`generateResponsiveCSS`, `generateResponsiveFieldCSS`, etc. — ver §8). (b) Encima, dentro del
+    propio repo hay dos versiones casi iguales: `generateContainerResponsiveCSS` vs
+    `generateDirectResponsiveCSS` (esta última con `!important`). Consolidar y, idealmente, delegar al
+    motor.
 
-```typescript
-// Schema parsing (very expensive)
-const { fields, handleValidation, isError, error, layout } = useMemo(() => {
-  return createHeadlessForm(schema, {
-    strictInputType: false,
-    initialValues,
-    asyncLoaders,
-  })
-}, [schema, initialValues, asyncLoaders])
+15. **`updateFormValue` expuesto pero sin uso** en UIForm: el form reemplaza todo `formValues` con
+    `setFormValues` en cada cambio en vez de actualizar un campo. Decidir cuál patrón queda.
 
-// Options transformation
-const autocompleteOptions = useMemo(() => {
-  return internalOptions.map(option => ({
-    label: option.label || String(option.value),
-    value: option.value,
-    disabled: option.disabled
-  }))
-}, [internalOptions])
-
-// Value-to-label mapping
-const valueToLabelMap = useMemo(() => {
-  const map = new Map<string, string>()
-  internalOptions.forEach(option => {
-    map.set(String(option.value), option.label)
-  })
-  return map
-}, [internalOptions])
-```
-
-#### 5. Lazy Evaluation
-
-```typescript
-// Don't compute dependency string on every render
-// Only compute inside useEffect when needed
-useEffect(() => {
-  if (!hasAsyncOptions || !asyncLoaderId) return
-
-  // Compute only when effect runs
-  const currentFormValues = getFormValues()
-  const dependencyValuesStr = JSON.stringify(
-    dependencies.map(dep => currentFormValues[dep])
-  )
-
-  // Rest of effect logic...
-}, [hasAsyncOptions, asyncLoaderId])  // Minimal dependencies
-```
-
-### Re-render Performance Comparison
-
-| Scenario | Before Optimization | After Optimization | Improvement |
-|----------|--------------------|--------------------|-------------|
-| Type in TextField | 10-15 components | 1 component | **90% reduction** |
-| Search in Autocomplete | 50+ components | 1 component | **98% reduction** |
-| Change in SelectField | 10-15 components | 2-3 components | **80% reduction** |
-| Form submission | All components | All components | No change (expected) |
-| Initial render | All components | All components | No change (expected) |
+16. **`useResponsiveCSS` genera el CSS en cada render** (no memoizado, `responsive-layout.ts:252`);
+    solo la inyección está gated por effect.
 
 ---
 
-## Best Practices Comparison
+## 12. Limitaciones reales (para setear expectativas)
 
-### Industry Standards vs UIForm Implementation
+- **Sin tests.** No hay unit tests, e2e ni benchmarks en el repo. Cualquier afirmación de
+  performance/cobertura/accesibilidad debe tratarse como no verificada hasta que existan.
+- **Anidamiento: corregido en utils, sin tests.** La transformación de valores y los defaults ahora
+  recorren `fieldset` y `group-array` recursivamente (§11.6, §11.7), pero **no hay tests** que cubran
+  esos casos anidados todavía.
+- **Dos patrones de async** conviven (§9).
+- **Documentación previa.** El resto de `docs/*` (ASYNC_OPTIONS, FORM_CONTEXT, etc.) **todavía no fue
+  auditada** contra el código y puede contener afirmaciones desactualizadas o inventadas, igual que la
+  versión anterior de este archivo. Tratar con cautela hasta auditar.
 
-#### 1. React Hook Form Pattern
+---
 
-**Industry Best Practice**:
-```typescript
-// React Hook Form approach
-const { register, handleSubmit, watch } = useForm()
+## 13. Glosario rápido de archivos
 
-<input {...register("firstName")} />  // Uncontrolled
 ```
-
-**UIForm Approach**:
-```typescript
-// Controlled components with stable callbacks
-<TextField
-  name="firstName"
-  value={values.firstName}
-  onChange={handleFieldChange}  // Stable reference
-/>
+src/
+├── components/
+│   ├── form/UIForm.tsx          ← componente principal + orquestador
+│   ├── fields/                  ← un componente por inputType
+│   └── commons/                 ← FieldLabel, ErrorMessage
+├── context/
+│   ├── FormContext.tsx          ← Provider + métodos
+│   └── reduce.ts                ← reducer + tipos del contexto
+├── hooks/
+│   ├── useFieldRenderer.tsx     ← inputType → componente
+│   └── useFormContext.ts        ← hook de acceso al contexto
+├── utils/
+│   ├── utils.ts                 ← formValuesToJsonValues, getDefaultValuesFromFields
+│   ├── setDeep.ts               ← asignación por path anidado
+│   └── responsive-layout.ts     ← generación + inyección de CSS grid
+├── types/                       ← tipos públicos
+└── lib/index.ts                 ← barrel de exports público
 ```
-
-**Comparison**:
-
-| Aspect | React Hook Form | UIForm | Winner |
-|--------|----------------|--------|---------|
-| Re-renders | Minimal (uncontrolled) | Optimized (controlled) | React Hook Form |
-| Schema Support | Plugin-based | Native | UIForm |
-| Dynamic Fields | Complex | Simple | UIForm |
-| Learning Curve | Medium | Low | UIForm |
-| Bundle Size | ~8KB | ~45KB (includes UI) | React Hook Form |
-
-**Decision**: UIForm prioritizes **schema-driven** approach over minimal bundle size.
-
-#### 2. Zustand vs Context API
-
-**Industry Recommendation**: Zustand for complex state, Context for simple.
-
-**UIForm Implementation**: Hybrid approach
-- Context for coordination
-- Ref-based getters for isolation
-- Local state for UI
-
-**Benchmarks**:
-
-```typescript
-// Hypothetical Zustand implementation
-const useFormStore = create((set, get) => ({
-  values: {},
-  setValue: (name, value) => set((state) => ({
-    values: { ...state.values, [name]: value }
-  }))
-}))
-
-// Field component
-const TextField = ({ name }) => {
-  const value = useFormStore((state) => state.values[name])
-  const setValue = useFormStore((state) => state.setValue)
-  // ...
-}
-```
-
-**Performance**: Zustand would be ~15% faster, but adds dependency and complexity.
-
-**Decision**: Context is sufficient with proper optimization (refs, memo).
-
-#### 3. Form State Location
-
-**Industry Best Practice**: Keep form state as close to usage as possible.
-
-**UIForm Implementation**: ✅ Follows this principle
-- Form-level state in UIForm
-- Field-level state in field components
-- Global coordination in Context
-
-#### 4. Validation Strategy
-
-**Industry Best Practice**: Schema-based validation with runtime checks.
-
-**UIForm Implementation**: ✅ JSON Schema validation
-- Declarative validation rules
-- Type-safe schemas
-- Custom error messages
-- Async validation support (future)
-
-#### 5. Accessibility
-
-**Industry Standard**: WCAG 2.1 AA
-
-**UIForm Implementation**:
-- ✅ Semantic HTML (label, input, fieldset)
-- ✅ ARIA attributes (aria-invalid, aria-required, aria-describedby)
-- ✅ Keyboard navigation
-- ✅ Screen reader support
-- ✅ Focus management
-- ✅ Error announcements
-
-**Accessibility Score**: 95/100 (tested with axe DevTools)
-
----
-
-## Performance Benchmarks
-
-### Test Environment
-
-- React 18.3.1
-- Ant Design 5.22.6
-- Chrome 131 (M1 Mac)
-- 50-field form with mixed field types
-
-### Results
-
-| Operation | Time (ms) | Re-renders | Memory |
-|-----------|-----------|-----------|--------|
-| Initial render | 45 | 52 (all fields) | 2.1 MB |
-| Type in TextField | 3 | 1 | +0.01 MB |
-| Search in Autocomplete | 120 | 1 | +0.05 MB |
-| Change SelectField | 8 | 2 | +0.02 MB |
-| Form validation | 12 | 5 (error fields) | +0.03 MB |
-| Form submission | 18 | 52 (all fields) | +0.08 MB |
-
-### Comparison with Competitors
-
-| Library | Initial Render | Type Input | Bundle Size |
-|---------|---------------|-----------|-------------|
-| UIForm | 45ms | 3ms | 45 KB |
-| React Hook Form | 35ms | 1ms | 8 KB |
-| Formik | 60ms | 8ms | 15 KB |
-| Antd Form | 50ms | 5ms | 120 KB (full Antd) |
-
-**Notes**:
-- UIForm includes UI components in bundle size
-- React Hook Form requires separate UI library
-- Formik has more re-renders due to older patterns
-
----
-
-## Architectural Decisions
-
-### ADR-001: Controlled vs Uncontrolled Components
-
-**Decision**: Use controlled components.
-
-**Rationale**:
-- Schema-driven requires React-managed state
-- Dynamic field visibility/enabling needs centralized state
-- Validation on change requires controlled inputs
-- Trade-off: More re-renders, but acceptable with optimization
-
-**Consequences**:
-- ✅ Easier to implement dynamic behavior
-- ✅ Centralized validation
-- ❌ More re-renders (mitigated with optimization)
-
-### ADR-002: Context API vs External Store
-
-**Decision**: Use Context API with ref-based optimization.
-
-**Rationale**:
-- React-native solution, no external dependencies
-- Sufficient performance with proper optimization
-- Simpler mental model for contributors
-- Easy to migrate to Zustand if needed
-
-**Consequences**:
-- ✅ No additional dependencies
-- ✅ Familiar to React developers
-- ❌ Requires manual optimization (refs, memo)
-
-### ADR-003: Local State for Async Options (Autocomplete)
-
-**Decision**: Store async options in component local state, not context.
-
-**Rationale**:
-- Prevent cascade re-renders
-- Autocomplete has frequent updates (on every keystroke)
-- Options are only needed by the autocomplete itself
-
-**Consequences**:
-- ✅ 98% reduction in re-renders
-- ✅ No focus loss
-- ❌ Inconsistent with SelectField pattern
-- ❌ Can't share options between fields (not a real use case)
-
-### ADR-004: Stable Callbacks with Refs
-
-**Decision**: Use ref-based pattern for callbacks.
-
-**Rationale**:
-- Prevent prop changes without losing reactivity
-- Enable React.memo to work effectively
-- Access latest values without re-creating callbacks
-
-**Consequences**:
-- ✅ Massive re-render reduction
-- ✅ React.memo actually works
-- ❌ Non-intuitive for beginners
-- ❌ Requires good documentation
-
-### ADR-005: Ant Design as UI Foundation
-
-**Decision**: Use Ant Design components.
-
-**Rationale**:
-- Production-ready, accessible components
-- Consistent design system
-- Active maintenance
-- Chinese + international community
-
-**Consequences**:
-- ✅ Fast development
-- ✅ Professional appearance
-- ✅ Accessibility built-in
-- ❌ Large bundle size (~120 KB for full Antd)
-- ❌ Theme customization complexity
-
----
-
-## Future Roadmap
-
-### Phase 1: Stability & Performance (Q1 2025)
-
-- [ ] Comprehensive unit tests (target: 90% coverage)
-- [ ] E2E tests with Playwright
-- [ ] Performance regression tests
-- [ ] Accessibility audit
-- [ ] Bundle size optimization
-- [ ] Documentation improvements
-
-### Phase 2: Developer Experience (Q2 2025)
-
-- [ ] Visual form builder (drag-and-drop)
-- [ ] Schema playground (live preview)
-- [ ] Storybook integration
-- [ ] Custom field type templates
-- [ ] Migration guide from Formik/RHF
-
-### Phase 3: Advanced Features (Q3 2025)
-
-- [ ] Multi-step wizard forms
-- [ ] Conditional field visibility (schema-driven)
-- [ ] Server-side validation integration
-- [ ] Async field-level validation
-- [ ] Undo/redo support
-- [ ] Form state persistence (localStorage)
-- [ ] Optimistic updates
-
-### Phase 4: Enterprise Features (Q4 2025)
-
-- [ ] Internationalization (i18n)
-- [ ] Multi-tenant support
-- [ ] Audit trail
-- [ ] Field-level permissions
-- [ ] Custom validation rules engine
-- [ ] Form versioning
-- [ ] A/B testing support
-
-### Potential Breaking Changes
-
-#### v2.0 (2025)
-
-**Context Refactor**:
-- Migrate to Zustand for better performance
-- Remove Context API for formValues
-- Keep Context for async cache
-
-**Stable Callback Removal**:
-- Consider React 19's automatic callback optimization
-- Simplify callback pattern if React 19 makes it unnecessary
-
-**TypeScript Strict Mode**:
-- Enable strict null checks
-- More precise generic types
-
----
-
-## Conclusion
-
-UIForm represents a **mature, production-ready** form library that successfully balances:
-
-- **Performance**: Through aggressive optimization
-- **Developer Experience**: Schema-driven, minimal boilerplate
-- **Flexibility**: Extensible architecture
-- **Maintainability**: Clear separation of concerns
-
-### Strengths
-
-1. **Schema-Driven**: JSON Schema is industry standard
-2. **Optimized**: Ref-based callbacks, local state isolation
-3. **Type-Safe**: Full TypeScript support
-4. **Accessible**: WCAG 2.1 AA compliant
-5. **Battle-Tested**: Based on proven patterns
-
-### Areas for Improvement
-
-1. **Consistency**: Unify state management patterns across fields
-2. **Documentation**: More examples and migration guides
-3. **Testing**: Increase coverage
-4. **Bundle Size**: Tree-shaking improvements
-5. **Async Validation**: Built-in support needed
-
-### Grade: A-
-
-UIForm is production-ready with room for iterative improvements. The architecture is sound, performance is excellent, and the API is intuitive.
-
----
-
-**Document Version**: 1.0
-**Last Reviewed**: 2025-11-16
-**Next Review**: 2025-12-16
-**Maintained By**: Core Team

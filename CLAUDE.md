@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-UIForm is a React + TypeScript form library built on top of `@remoteoss/json-schema-form` (headless JSON Schema form library) and Ant Design components. It provides a declarative way to build complex forms with responsive layouts, async data loading, and validation.
+UIForm is a React + TypeScript form library built on top of `@laus/json-schema-form` (headless JSON Schema form library) and Ant Design components. It provides a declarative way to build complex forms with responsive layouts, async data loading, and validation.
 
-**Important**: This project depends on a local package `@remoteoss/json-schema-form` located at `/Users/alexocsa/Documents/dev/projects/json-schema-form`. Changes to the core json-schema-form library should be made in that repository.
+**Important**: This project depends on `@laus/json-schema-form` — a fork of `@remoteoss/json-schema-form`. Its source lives locally at `/Users/alexocsa/Documents/dev/laus/json-schema-form` (git remote `github.com/DaikonCOde/json-schema-form`, published as `@laus/json-schema-form`, currently v1.2.4). Changes to the core json-schema-form library should be made in that repository, not here.
 
 ## Common Commands
 
@@ -31,7 +31,7 @@ npm run preview      # Preview production build locally
 
 The form system uses a **headless + presentation layer** architecture:
 
-1. **Headless Layer** (`@remoteoss/json-schema-form`): Handles schema parsing, validation, field generation, and layout computation
+1. **Headless Layer** (`@laus/json-schema-form`): Handles schema parsing, validation, field generation, and layout computation
 2. **Presentation Layer** (this repo): Maps headless fields to Ant Design components
 
 ### Key Components
@@ -71,7 +71,7 @@ Breakpoints: sm (mobile, 0px), md (tablet, 768px), lg (desktop, 1024px), xl (lar
 
 ### JSON Schema Extensions
 
-This library uses custom JSON Schema extensions from `@remoteoss/json-schema-form`:
+This library uses custom JSON Schema extensions from `@laus/json-schema-form`:
 
 - `x-jsf-presentation`: Input type, options, async options config
 - `x-jsf-layout`: Column span (responsive), positioning
@@ -145,4 +145,4 @@ const { formValues, updateFormValue } = useFormContext()
 
 - All field components extend `BaseFieldProps` from `src/types/types.d.ts`
 - Union type `FieldProps` provides discriminated union for all field types
-- `@remoteoss/json-schema-form` types are imported for schema definitions
+- `@laus/json-schema-form` types are imported for schema definitions

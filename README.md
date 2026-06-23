@@ -70,7 +70,7 @@ npm install @laus/json-schema-form dayjs
 
 ```typescript
 import { UIForm } from '@laus/uiform'
-import '@laus/uiform/dist/style.css'
+import '@laus/uiform/style.css'
 import type { JsfObjectSchema } from '@laus/uiform'
 
 const schema: JsfObjectSchema = {
