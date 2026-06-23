@@ -29,9 +29,31 @@ const schema: JsfObjectSchema = {
     email: { type: 'string', title: 'Email', format: 'email' },
     edad: { type: 'number', title: 'Edad', minimum: 0 },
     pais: { type: 'string', title: 'País' },
+    ciudad: { type: 'string', title: 'Ciudad' },
     bio: { type: 'string', title: 'Bio' },
     nacimiento: { type: 'string', title: 'Fecha de nacimiento' },
     acepta: { type: 'boolean', title: 'Acepto los términos' },
+    // Contenedor: fieldset → objeto anidado.
+    direccion: {
+      type: 'object',
+      title: 'Dirección',
+      properties: {
+        calle: { type: 'string', title: 'Calle' },
+        numero: { type: 'number', title: 'Número' },
+      },
+    },
+    // Contenedor: group-array → array de objetos.
+    contactos: {
+      type: 'array',
+      title: 'Contactos',
+      items: {
+        type: 'object',
+        properties: {
+          nombre: { type: 'string', title: 'Nombre' },
+          telefono: { type: 'string', title: 'Teléfono' },
+        },
+      },
+    },
   },
 }
 
@@ -39,15 +61,27 @@ const schema: JsfObjectSchema = {
 const uiSchema: UiSchema = {
   'ui:sections': [
     { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad'] },
-    { id: 'extra', title: 'Información adicional', fields: ['pais', 'nacimiento', 'bio', 'acepta'] },
+    { id: 'extra', title: 'Información adicional', fields: ['pais', 'ciudad', 'nacimiento', 'bio', 'acepta'] },
+    { id: 'avanzado', title: 'Contenedores (fieldset + group-array)', fields: ['direccion', 'contactos'] },
   ],
   nombre: { 'ui:widget': 'text', 'ui:placeholder': 'Tu nombre', 'ui:autofocus': true },
   email: { 'ui:widget': 'email', 'ui:placeholder': 'tu@mail.com' },
   edad: { 'ui:widget': 'number', 'ui:placeholder': '0' },
   pais: { 'ui:widget': 'select', 'ui:options': { asyncOptions: { id: 'paises' } } },
+  ciudad: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá tu ciudad...', 'ui:options': { asyncOptions: { id: 'ciudades', searchable: true } } },
   bio: { 'ui:widget': 'textarea', 'ui:placeholder': 'Contanos algo...' },
   nacimiento: { 'ui:widget': 'date' },
   acepta: { 'ui:widget': 'checkbox' },
+  direccion: {
+    'ui:widget': 'fieldset',
+    calle: { 'ui:widget': 'text', 'ui:placeholder': 'Av. Siempreviva' },
+    numero: { 'ui:widget': 'number', 'ui:placeholder': '742' },
+  },
+  contactos: {
+    'ui:widget': 'group-array',
+    nombre: { 'ui:widget': 'text' },
+    telefono: { 'ui:widget': 'text' },
+  },
 }
 
 // ── 3) asyncLoaders: opciones del Select cargadas async desde el store ──
@@ -63,6 +97,14 @@ const asyncLoaders: Record<string, AsyncOptionsLoader> = {
         { label: 'Brasil', value: 'br' },
       ],
     }
+  },
+  // Autocomplete searchable: filtra server-side por el término tipeado (insensible a acentos).
+  ciudades: async ({ search }) => {
+    await new Promise((r) => setTimeout(r, 300))
+    const all = ['Buenos Aires', 'Córdoba', 'Rosario', 'Mendoza', 'La Plata', 'Mar del Plata', 'Salta']
+    const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    const q = norm(search ?? '')
+    return { options: all.filter((c) => norm(c).includes(q)).map((c) => ({ label: c, value: c })) }
   },
 }
 
