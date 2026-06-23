@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { Card, Button, Space, Popconfirm } from 'antd'
 import { PlusOutlined, DeleteOutlined, DragOutlined } from '@ant-design/icons'
 import { ErrorMessage, FieldLabel } from '../commons'
@@ -43,22 +43,33 @@ export function GroupArrayField({
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
 
+  // Keys sintéticas estables: la React key NO puede salir de un campo editable (p.ej. `id`), o editar
+  // ese campo remonta la fila y pierde foco. Generamos un uid interno al AGREGAR y lo mantenemos en
+  // paralelo al array de valores; remove filtra el mismo índice. (REVIEW_V2.md §1)
+  const uidCounter = useRef(0)
+  const nextUid = useCallback(() => `gai-${uidCounter.current++}`, [])
+  const [itemKeys, setItemKeys] = useState<string[]>(() =>
+    (Array.isArray(value) ? value : []).map(() => nextUid()),
+  )
+
   const handleAddItem = useCallback(() => {
     if (!internalTouched) setInternalTouched(true)
-    
+
     // Crear un nuevo item vacío basado en los campos
     const newItem = fields.reduce((acc, field) => {
       acc[field.name] = field.default || getDefaultValueForType(field.inputType)
       return acc
     }, {} as any)
-    
+
+    setItemKeys((prev) => [...prev, nextUid()])
     const newArray = Array.isArray(value) ? [...value, newItem] : [newItem]
     onChange(name, newArray)
-  }, [name, onChange, value, fields, internalTouched])
+  }, [name, onChange, value, fields, internalTouched, nextUid])
 
   const handleRemoveItem = useCallback((index: number) => {
     if (!internalTouched) setInternalTouched(true)
-    
+
+    setItemKeys((prev) => prev.filter((_, i) => i !== index))
     const newArray = Array.isArray(value) ? value.filter((_, i) => i !== index) : []
     onChange(name, newArray)
   }, [name, onChange, value, internalTouched])
@@ -103,7 +114,9 @@ export function GroupArrayField({
         ) : (
           <Space direction="vertical" style={{ width: '100%' }}>
             {arrayValue.map((item, index) => {
-              const itemKey = item.id || item._id || `${name}-${index}`
+              // Key sintética estable (no derivada de un campo editable). Fallback por índice solo si el
+              // array fue mutado por fuera (p.ej. reset del store) y aún no resincronizamos las keys.
+              const itemKey = itemKeys[index] ?? `${name}-fallback-${index}`
               return (
               <Card
                 key={itemKey}

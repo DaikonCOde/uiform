@@ -80,14 +80,14 @@ export function SelectField({
     searchTimer.current = setTimeout(() => reload(searchValue), 250)
   }, [hasAsyncOptions, searchable, reload])
 
-  // Mergea opciones async (del store) con las estáticas del schema; las async tienen prioridad si existen.
+  // Si el field es async, la fuente es SIEMPRE el store (aunque venga vacío): así una búsqueda con 0
+  // resultados muestra notFoundContent y no cae a las estáticas (opciones stale). Estáticas solo sin async.
   const selectOptions = useMemo(() => {
-    const source =
-      hasAsyncOptions && asyncLoadedOptions.length > 0
-        ? asyncLoadedOptions
-        : Array.isArray(options)
-          ? options
-          : []
+    const source = hasAsyncOptions
+      ? asyncLoadedOptions
+      : Array.isArray(options)
+        ? options
+        : []
     return source.map(toOption)
   }, [hasAsyncOptions, asyncLoadedOptions, options])
 

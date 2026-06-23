@@ -118,6 +118,44 @@ describe("resolveSections", () => {
     expect(result[1].fieldNames).toEqual(["a"]);
   });
 
+  it("sección sin `fields` (malformada) → warn, no throw, el resto intacto", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fields = [f("a"), f("b")];
+    // Primera sección sin `fields` (uiSchema malformado); la segunda bien formada.
+    const schema = schemaWith([
+      { id: "broken" } as unknown as { id: string; fields: string[] },
+      { id: "ok", fields: ["a", "b"] },
+    ]);
+
+    let result!: ReturnType<typeof resolveSections>;
+    expect(() => {
+      result = resolveSections(schema, fields);
+    }).not.toThrow();
+
+    expect(warn).toHaveBeenCalled();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("broken"))).toBe(true);
+
+    // La sección rota queda vacía; la sección válida conserva sus campos.
+    const broken = result.find((s) => s.id === "broken")!;
+    const ok = result.find((s) => s.id === "ok")!;
+    expect(broken.fields).toEqual([]);
+    expect(broken.fieldNames).toEqual([]);
+    expect(ok.fieldNames).toEqual(["a", "b"]);
+  });
+
+  it("sección con `fields` no-array → warn, no throw", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fields = [f("a")];
+    const schema = schemaWith([
+      { id: "bad", fields: "a" } as unknown as { id: string; fields: string[] },
+    ]);
+
+    expect(() => resolveSections(schema, fields)).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+    const result = resolveSections(schema, fields);
+    expect(result.find((s) => s.id === "bad")!.fields).toEqual([]);
+  });
+
   it("sin x-jsf-sections → una única sección __default__ con todos los fields en orden", () => {
     const fields = [f("a"), f("b"), f("c")];
 

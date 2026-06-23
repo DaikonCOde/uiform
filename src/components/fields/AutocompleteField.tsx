@@ -1,89 +1,41 @@
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-} from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Autocomplete presentacional sobre Ant Design: async unificado vía useAsyncOptions (del store), igual que Select. (ARCHITECTURE_V2.md §8)
+
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { AutoComplete, Spin } from "antd";
 import { ErrorMessage, FieldLabel } from "../commons";
+import { useAsyncOptions } from "../../hooks/useAsyncOptions";
 import type { AutocompleteFieldProps } from "../../types";
 import styles from "./Field.module.css";
 
 // Referencia estable para "sin opciones": evita crear un array nuevo por render.
 const EMPTY_OPTIONS: any[] = [];
 
-// Wrapper interno simplificado - ya no necesita workaround de focus
-const StableAutocomplete = React.memo(({
-  inputValue,
-  onInputChange,
-  onSelectOption,
-  onBlurHandler,
-  onSearchHandler,
-  autocompleteOptions,
-  isSearchable,
-  placeholder,
-  disabled,
-  loading,
-  allowClear,
-  error,
-  asyncError,
-  isTouched,
-  submitted,
-  required,
-  name,
-  filteredAntdProps
-}: any) => {
-  return (
-    <AutoComplete
-      id={name}
-      value={inputValue}
-      onChange={onInputChange}
-      onSelect={onSelectOption}
-      onBlur={onBlurHandler}
-      onSearch={isSearchable ? onSearchHandler : undefined}
-      placeholder={placeholder || `Search...`}
-      disabled={disabled}  // Don't disable on loading - causes focus loss
-      allowClear={allowClear}
-      options={autocompleteOptions}
-      filterOption={false}
-      getPopupContainer={(trigger: any) => trigger.parentElement}
-      status={
-        (error || asyncError) && (isTouched || submitted)
-          ? ("error" as "" | "error" | "warning")
-          : undefined
-      }
-      notFoundContent={
-        loading ? <Spin size="small" /> : asyncError ? asyncError : "No results"
-      }
-      aria-invalid={!!(error || asyncError)}
-      aria-describedby={error || asyncError ? `${name}-error` : undefined}
-      aria-required={required}
-      style={{ width: "100%" }}
-      {...filteredAntdProps}
-    />
-  );
-}, (prevProps, nextProps) => {
-  // Re-renderizar si cambia cualquier prop que afecte el render. Las opciones se comparan por
-  // REFERENCIA (autocompleteOptions es estable por contenido vía useMemo), no por `length`
-  // (que se comía cambios de contenido con la misma cantidad). Incluimos isTouched/submitted
-  // porque el status de error depende de ellos.
-  return (
-    prevProps.inputValue === nextProps.inputValue &&
-    prevProps.disabled === nextProps.disabled &&
-    prevProps.loading === nextProps.loading &&
-    prevProps.error === nextProps.error &&
-    prevProps.asyncError === nextProps.asyncError &&
-    prevProps.isTouched === nextProps.isTouched &&
-    prevProps.submitted === nextProps.submitted &&
-    prevProps.required === nextProps.required &&
-    prevProps.placeholder === nextProps.placeholder &&
-    prevProps.allowClear === nextProps.allowClear &&
-    prevProps.isSearchable === nextProps.isSearchable &&
-    prevProps.name === nextProps.name &&
-    prevProps.autocompleteOptions === nextProps.autocompleteOptions
-  );
-});
+// Construye el shape { label, value } de AntD desde una opción (objeto u escalar).
+function toOption(option: any) {
+  if (typeof option === "object" && option !== null) {
+    return {
+      label: option.label || option.title || String(option.value),
+      value: option.value,
+      disabled: option.disabled,
+      ...option,
+    };
+  }
+  return { label: String(option), value: option };
+}
+
+// Extrae la etiqueta visible de una opción (objeto u escalar).
+function optionLabel(option: any): string {
+  if (typeof option === "object" && option !== null) {
+    return option.label || option.title || String(option.value);
+  }
+  return String(option);
+}
+
+// Extrae el value de una opción (objeto u escalar).
+function optionValue(option: any): any {
+  return typeof option === "object" && option !== null ? option.value : option;
+}
 
 export const AutocompleteField = React.memo(function AutocompleteField({
   name,
@@ -108,187 +60,97 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   getFormValues,
   ...antdProps
 }: AutocompleteFieldProps) {
-  // getFormValues now comes from props to avoid context subscription
-
   const [internalTouched, setInternalTouched] = useState(false);
   const isTouched = touched ?? internalTouched;
 
-  // Estado local para el valor del input (necesario para AutoComplete de Ant Design)
+  // Estado local del texto del input: AntD AutoComplete es un input controlado por texto (no por value).
   const [inputValue, setInputValue] = useState<string>("");
 
-  // NUEVO: Estado interno para async options (en lugar de context)
-  const [internalOptions, setInternalOptions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [asyncError, setAsyncError] = useState<string | null>(null);
-
-  // Determinar si el campo usa async options y su ID
+  // El async vive en el store (igual que SelectField): activo solo si el field trae asyncOptions.id. (ARCHITECTURE_V2.md §8)
   const asyncLoaderId = asyncOptions?.id;
-  const hasAsyncOptions = useMemo(() => {
-    return !!asyncOptions?.loader && !!asyncLoaderId;
-  }, [asyncOptions, asyncLoaderId]);
+  const hasAsyncOptions = !!asyncLoaderId;
+  // searchable: por default el autocomplete busca; respeta el flag explícito del schema si está.
+  const searchable = (asyncOptions as any)?.searchable ?? true;
 
-  // Ref para mantener la referencia más actual de asyncOptions
-  const asyncOptionsRef = useRef(asyncOptions);
+  // Suscripción granular a async[loaderId] + recarga al cambiar deps; warning dev si el id no resuelve loader.
+  const {
+    options: asyncLoadedOptions,
+    loading,
+    error: asyncError,
+    reload,
+  } = useAsyncOptions(asyncLoaderId, asyncOptions?.dependencies);
 
-  // Actualizar refs en cada render
-  useEffect(() => {
-    asyncOptionsRef.current = asyncOptions;
-  }, [asyncOptions]);
+  // Fuente de opciones: store si es async (aunque venga vacío → notFoundContent), estáticas si no.
+  const autocompleteOptions = useMemo(() => {
+    const source = hasAsyncOptions
+      ? asyncLoadedOptions
+      : Array.isArray(options)
+        ? options
+        : null;
+    if (!source) return EMPTY_OPTIONS;
+    return source.map(toOption);
+  }, [hasAsyncOptions, asyncLoadedOptions, options]);
 
-  // Cargar opciones async al montar (si no es searchable)
-  // Este effect NO se ejecuta cuando formValues cambia (para evitar re-renders)
-  // Solo se ejecuta cuando el loader o sus dependencias estructurales cambian
-  useEffect(() => {
-    if (!hasAsyncOptions || !asyncLoaderId) return;
-
-    const asyncConfig = asyncOptions;
-    if (!asyncConfig?.loader || asyncConfig.searchable) return;
-
-    const loadAsyncOptions = async () => {
-      if (!asyncConfig.loader) return; // Extra safety check
-
-      setLoading(true);
-      setAsyncError(null);
-
-      try {
-        // Get current form values without subscribing
-        if (!getFormValues) return;
-        const currentFormValues = getFormValues();
-
-        // Pasar el contexto completo al loader
-        const result = await asyncConfig.loader({ formValues: currentFormValues, search: "" });
-        setInternalOptions(result.options || []);
-      } catch (err) {
-        const errorMsg =
-          err instanceof Error ? err.message : "Failed to load options";
-        setAsyncError(errorMsg);
-        setInternalOptions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAsyncOptions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAsyncOptions, asyncLoaderId]);
-
-  // Mapa de value -> label para encontrar el label cuando tenemos solo el value
+  // Mapa value→label para mostrar la etiqueta cuando el form solo nos da el value (selección externa/reset).
   const valueToLabelMap = useMemo(() => {
     const map = new Map<string, string>();
-
-    if (hasAsyncOptions && internalOptions.length > 0) {
-      internalOptions.forEach((option: any) => {
-        if (typeof option === "object" && option !== null) {
-          map.set(
-            String(option.value),
-            option.label || option.title || String(option.value)
-          );
-        } else {
-          map.set(String(option), String(option));
-        }
-      });
-    } else if (options && Array.isArray(options)) {
-      options.forEach((option: any) => {
-        if (typeof option === "object" && option !== null) {
-          map.set(
-            String(option.value),
-            option.label || option.title || String(option.value)
-          );
-        } else {
-          map.set(String(option), String(option));
-        }
-      });
-    }
-
-    return map;
-  }, [options, hasAsyncOptions, internalOptions]);
-
-  // Ref para trackear el valor anterior y detectar cambios reales
-  const prevValueRef = useRef(value);
-
-  // Sincronizar SOLO cuando el value del form realmente cambia (no cuando el usuario escribe)
-  useEffect(() => {
-    // Solo actuar si el value del form cambió realmente
-    if (value !== prevValueRef.current) {
-      if (value) {
-        // Hay un nuevo value del form, sincronizar el input
-        const label = valueToLabelMap.get(String(value));
-        const newValue = label || String(value);
-        setInputValue(newValue);
-      } else {
-        // El value cambió a vacío (reset explícito del form)
-        setInputValue("");
+    const source = hasAsyncOptions ? asyncLoadedOptions : options;
+    if (Array.isArray(source)) {
+      for (const option of source) {
+        map.set(String(optionValue(option)), optionLabel(option));
       }
+    }
+    return map;
+  }, [hasAsyncOptions, asyncLoadedOptions, options]);
+
+  // Sincroniza el texto del input SOLO cuando el value del form cambia de verdad (no mientras el usuario tipea):
+  // así una selección/reset externo refleja su label, sin pisar lo que el usuario está escribiendo. (anti-loop)
+  const prevValueRef = useRef(value);
+  useEffect(() => {
+    if (value !== prevValueRef.current) {
+      setInputValue(value ? valueToLabelMap.get(String(value)) ?? String(value) : "");
       prevValueRef.current = value;
     }
   }, [value, valueToLabelMap]);
 
-  // Handler para búsqueda en async options
+  // Búsqueda async: re-invoca el loader del store con el término (debounce simple para no spamear). (ARCHITECTURE_V2.md §8)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = useCallback(
-    async (searchValue: string) => {
-      // Usar ref para obtener la configuración async más actual
-      const asyncConfig = asyncOptionsRef.current;
-
-      // Si no hay configuración async o no es searchable, no hacer nada
-      if (!asyncConfig?.loader || !asyncLoaderId) return;
-
-      // Si el searchValue está vacío y no es searchable, no buscar
-      if (!searchValue && !asyncConfig.searchable) return;
-
-      setLoading(true);
-      setAsyncError(null);
-
-      try {
-        if (!getFormValues) return;
-        // Get current form values without subscribing
-        const currentFormValues = getFormValues();
-
-        // Llamar al loader con los valores actuales
-        const result = await asyncConfig.loader({
-          search: searchValue,
-          formValues: currentFormValues,
-        });
-        setInternalOptions(result.options || []);
-      } catch (err) {
-        const errorMsg =
-          err instanceof Error ? err.message : "Failed to search options";
-        setAsyncError(errorMsg);
-        setInternalOptions([]);
-      } finally {
-        setLoading(false);
-      }
+    (searchValue: string) => {
+      if (!hasAsyncOptions || !searchable) return;
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(() => reload(searchValue), 250);
     },
-    [asyncLoaderId]  // getFormValues is stable, no need in deps
+    [hasAsyncOptions, searchable, reload],
   );
 
-  // Handler cuando se selecciona una opción del dropdown
+  // Limpia el timer pendiente al desmontar para no llamar reload sobre un componente muerto.
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
+
+  // Selección del dropdown: muestra el label y guarda el value en el store. (contrato onChange(name, value))
   const handleSelect = useCallback(
     (selectedValue: string, option: any) => {
       if (!internalTouched) setInternalTouched(true);
-
-      // Actualizar el estado
-      const label = option?.label || selectedValue;
-      setInputValue(label);
-
-      // Guardar el value en el form state
+      setInputValue(option?.label ?? selectedValue);
       onChange(name, selectedValue);
     },
-    [name, onChange, internalTouched]
+    [name, onChange, internalTouched],
   );
 
-  // Handler cuando se cambia el input manualmente (sin seleccionar)
+  // Tipeo manual (sin seleccionar): actualiza el texto; limpia el value del form solo si el input se vacía.
   const handleChange = useCallback(
     (val: string) => {
-
-      setInputValue(val); // Actualizar estado (causa re-render pero necesario)
-
-      // Solo limpiar el form value si el input se vacía completamente
+      setInputValue(val);
       if (!val && value) {
         if (!internalTouched) setInternalTouched(true);
         onChange(name, "");
       }
     },
-    [name, onChange, value, internalTouched]
+    [name, onChange, value, internalTouched],
   );
 
   const handleBlur = useCallback(() => {
@@ -296,36 +158,13 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     onBlur?.(name);
   }, [name, onBlur, internalTouched]);
 
-  // Determinar las opciones a usar (useMemo PURO: no muta refs adentro).
-  const autocompleteOptions = useMemo(() => {
-    const source =
-      hasAsyncOptions && internalOptions.length > 0
-        ? internalOptions
-        : Array.isArray(options)
-        ? options
-        : null;
-
-    if (!source) return EMPTY_OPTIONS;
-
-    return source.map((option: any) => {
-      if (typeof option === "object" && option !== null) {
-        return {
-          label: option.label || option.title || String(option.value),
-          value: option.value,
-          disabled: option.disabled,
-          ...option,
-        };
-      }
-      return { label: String(option), value: option };
-    });
-  }, [options, hasAsyncOptions, internalOptions]);
-
-  // Memoizar las props del AutoComplete para evitar re-creación innecesaria
-  const isSearchable = hasAsyncOptions ? asyncOptions?.searchable : true;
-  const { _rootLayout, jsonType, ...filteredAntdProps } = antdProps;
-  
   if (!isVisible) return null;
 
+  const isSearchable = hasAsyncOptions ? searchable : true;
+
+  // Stripping de props internas del motor (no son props válidas de <AutoComplete>). (ARCHITECTURE_V2.md §1 bis)
+  const { type, jsonType, _rootLayout, errorMessage, ...filteredAntdProps } =
+    antdProps as any;
 
   return (
     <div className={`${styles.field} ${className || ""}`} style={style}>
@@ -336,25 +175,33 @@ export const AutocompleteField = React.memo(function AutocompleteField({
         description={description}
       />
 
-      <StableAutocomplete
-        inputValue={inputValue}
-        onInputChange={handleChange}
-        onSelectOption={handleSelect}
-        onBlurHandler={handleBlur}
-        onSearchHandler={handleSearch}
-        autocompleteOptions={autocompleteOptions}
-        isSearchable={isSearchable}
-        placeholder={placeholder}
+      <AutoComplete
+        id={name}
+        value={inputValue}
+        onChange={handleChange}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        onSearch={isSearchable ? handleSearch : undefined}
+        placeholder={placeholder || "Search..."}
         disabled={disabled}
-        loading={loading}
         allowClear={allowClear}
-        error={error}
-        asyncError={asyncError}
-        isTouched={isTouched}
-        submitted={submitted}
-        required={required}
-        name={name}
-        filteredAntdProps={filteredAntdProps}
+        options={autocompleteOptions}
+        // En búsqueda async el filtrado lo hace el loader (server-side) → sin filtro local.
+        filterOption={false}
+        getPopupContainer={(trigger: any) => trigger.parentElement}
+        status={
+          (error || asyncError) && (isTouched || submitted)
+            ? ("error" as "" | "error" | "warning")
+            : undefined
+        }
+        notFoundContent={
+          loading ? <Spin size="small" /> : asyncError ? asyncError : "No results"
+        }
+        aria-invalid={!!(error || asyncError)}
+        aria-describedby={error || asyncError ? `${name}-error` : undefined}
+        aria-required={required}
+        style={{ width: "100%" }}
+        {...filteredAntdProps}
       />
 
       {(isTouched || submitted) && (

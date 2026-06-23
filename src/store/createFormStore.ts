@@ -69,6 +69,9 @@ export function createFormStore(
       // setPath clona la raíz y solo la rama tocada (inmutable, preserva refs de hermanos). (paths.ts)
       set((s) => ({ values: setPath(s.values, name, value) }));
       if (opts.config?.validateTrigger === "onChange") get().validate();
+      // CONTRATO: `errors` reflejan la ÚLTIMA validación, no el estado del value recién tipeado.
+      // Solo con validateTrigger:'onChange' corrió validate() arriba → acá van frescos. Con otros
+      // triggers (onBlur/onSubmit) son los últimos errores conocidos (p. ej. {} si aún no se validó).
       opts.onChange?.(
         formValuesToJsonValues(get().values, get().fields),
         get().errors,

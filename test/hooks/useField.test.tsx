@@ -1,10 +1,10 @@
 // Tests de useField (ARCHITECTURE_V2.md §5): value/error/touched correctos, setValue actualiza, callbacks estables.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import React from "react";
 
-import { FormProvider } from "../../src/context/FormStoreContext";
+import { FormProvider, useFormStoreApi } from "../../src/context/FormStoreContext";
 import { useField } from "../../src/hooks/useField";
 import type { JsfObjectSchema } from "@laus/json-schema-form";
 
@@ -19,6 +19,27 @@ const schema: JsfObjectSchema = {
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <FormProvider schema={schema}>{children}</FormProvider>;
+}
+
+// Schema con un fieldset (`address`) cuyo hijo es requerido: validar sin valor produce un error
+// ANIDADO (objeto) en errors.address — el caso que recreaba la ref en cada validate().
+const nestedSchema: JsfObjectSchema = {
+  type: "object",
+  properties: {
+    address: {
+      type: "object",
+      "x-jsf-presentation": { inputType: "fieldset" },
+      properties: {
+        street: { type: "string", "x-jsf-presentation": { inputType: "text" } },
+      },
+      required: ["street"],
+    },
+  },
+  required: ["address"],
+} as JsfObjectSchema;
+
+function nestedWrapper({ children }: { children: React.ReactNode }) {
+  return <FormProvider schema={nestedSchema}>{children}</FormProvider>;
 }
 
 describe("useField", () => {
@@ -48,6 +69,38 @@ describe("useField", () => {
     // Validamos a través del flujo: el error aparece tras una validación que setea errors.
     // Aquí comprobamos el caso sin error inicial (no se validó todavía).
     expect(api.current.error).toBeUndefined();
+  });
+
+  it("NO re-renderiza el hook al revalidar dos veces con el MISMO error anidado (fieldset)", () => {
+    let renders = 0;
+    const { result } = renderHook(
+      () => {
+        renders++;
+        const field = useField("address");
+        const store = useFormStoreApi();
+        return { field, store };
+      },
+      { wrapper: nestedWrapper },
+    );
+
+    const baselineAfterFirstValidate = (() => {
+      // 1ra validación: street vacío → aparece el error anidado en address (objeto). Esto SÍ re-renderiza.
+      act(() => {
+        result.current.store.getState().validate();
+      });
+      return renders;
+    })();
+
+    // El error ya está presente y es no-undefined (objeto anidado).
+    expect(result.current.field.error).toBeDefined();
+
+    // 2da validación idéntica: el store recrea el objeto errors (ref nueva) con el MISMO contenido.
+    // Con igualdad por valor del slot error, el hook NO debe re-renderizar.
+    act(() => {
+      result.current.store.getState().validate();
+    });
+
+    expect(renders).toBe(baselineAfterFirstValidate);
   });
 
   it("onChange y onBlur mantienen identidad ESTABLE entre re-renders", () => {

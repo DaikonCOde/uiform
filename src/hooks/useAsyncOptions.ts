@@ -4,12 +4,15 @@
 import { useCallback, useEffect } from "react";
 import { shallow } from "zustand/shallow";
 
-import { useFormStore } from "../context/FormStoreContext";
+import { useFormStore, useFormStoreApi } from "../context/FormStoreContext";
 import { useWatch } from "./useWatch";
 import type { AsyncOptionState, FormState } from "../store/types";
 
 // Estado por defecto cuando el loader aún no corrió o no hay loaderId: evita undefined en los consumidores.
 const EMPTY: AsyncOptionState = { options: [], loading: false, error: null };
+
+// Ids ya advertidos (a nivel módulo): el warning de loader inexistente sale UNA sola vez por id, no por render.
+const warnedLoaderIds = new Set<string>();
 
 export interface UseAsyncOptions {
   options: any[];
@@ -42,11 +45,30 @@ export function useAsyncOptions(
   // Acción estable del store (referencia fija → no recrea callbacks ni reanima el effect).
   const loadAsyncOptions = useFormStore((s: FormState) => s.loadAsyncOptions);
 
+  // Ref cruda al store (sin suscripción): para inspeccionar el snapshot tras disparar la carga y
+  // detectar un loaderId que no resuelve ningún loader (ver reload).
+  const storeApi = useFormStoreApi();
+
   const reload = useCallback(
     (search?: string) => {
-      if (loaderId) loadAsyncOptions(loaderId, search);
+      if (!loaderId) return;
+      loadAsyncOptions(loaderId, search);
+      // Detección de loader inexistente (solo dev): un loader real flipea async[loaderId].loading=true
+      // SÍNCRONAMENTE en el primer set() antes de su primer await; un id sin loader retorna temprano y
+      // deja el slice undefined. Si sigue undefined justo después de disparar, no hay loader que matchee.
+      if (
+        import.meta.env?.DEV &&
+        !warnedLoaderIds.has(loaderId) &&
+        storeApi.getState().async[loaderId] === undefined
+      ) {
+        warnedLoaderIds.add(loaderId);
+        console.warn(
+          `[UIForm] asyncOptions.id "${loaderId}" no matchea ningún loader en asyncLoaders. ` +
+            `Las opciones quedarán vacías. Registralo en la prop asyncLoaders del formulario.`,
+        );
+      }
     },
-    [loaderId, loadAsyncOptions],
+    [loaderId, loadAsyncOptions, storeApi],
   );
 
   // Valores de las dependencias: re-render (y re-carga) solo cuando cambian SUS deps. (ARCHITECTURE_V2.md §8)

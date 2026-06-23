@@ -95,6 +95,28 @@ describe("useAsyncOptions", () => {
     await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
   });
 
+  it("advierte (dev) una sola vez cuando el loaderId no matchea ningún loader", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // id inexistente: no está en asyncLoaders → el store retorna temprano y el slice queda undefined.
+    const { rerender } = renderHook(() => useAsyncOptions("fantasma", []), {
+      wrapper: makeWrapper(vi.fn()),
+    });
+
+    await waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("fantasma"),
+      ),
+    );
+    const callsAfterFirst = warn.mock.calls.length;
+
+    // Re-render: el warning NO debe spamear (una sola vez por id).
+    rerender();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(warn.mock.calls.length).toBe(callsAfterFirst);
+
+    warn.mockRestore();
+  });
+
   it("sin loaderId queda inerte (no carga, devuelve defaults)", async () => {
     const loader = vi.fn(async () => ({ options: [{ label: "X", value: "x" }] }));
     const { result } = renderHook(() => useAsyncOptions(undefined), {

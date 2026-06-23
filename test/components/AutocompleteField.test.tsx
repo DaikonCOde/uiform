@@ -104,9 +104,30 @@ describe("AutocompleteField vía <Field> (Fase 4)", () => {
 
     // Cambiar el value del campo NO debe re-disparar el loader (carga inicial atada a deps estructurales).
     act(() => setValue("pais", "uy"));
-    // Pequeña ventana para detectar un loop/recarga indebida.
-    await new Promise((r) => setTimeout(r, 50));
+    // Varios cambios externos consecutivos: si hubiera loop, el loader se dispararía en cascada.
+    act(() => setValue("pais", "ar"));
+    act(() => setValue("pais", ""));
+    // Ventana amplia para detectar cualquier recarga diferida (debounce/effect tardío).
+    await new Promise((r) => setTimeout(r, 100));
 
     expect((loader as any).mock.calls.length).toBe(callsAfterMount);
+  });
+
+  it("la búsqueda en el input recarga las opciones vía el loader del store (debounced)", async () => {
+    const user = userEvent.setup();
+    const loader = makeLoader();
+    renderForm(loader);
+
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
+
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.type(input, "Uru");
+
+    // onSearch → reload(search) re-invoca el loader; el debounce colapsa el tipeo en una sola recarga extra.
+    await waitFor(() => expect((loader as any).mock.calls.length).toBeGreaterThan(1));
+    const lastCall = (loader as any).mock.calls.at(-1)[0];
+    expect(lastCall).toHaveProperty("search");
+    expect(lastCall.search).toContain("Uru");
   });
 });

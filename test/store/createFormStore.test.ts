@@ -115,4 +115,36 @@ describe("createFormStore", () => {
     store.getState().setValue("age", 5);
     expect(store.getState().errors).toHaveProperty("name");
   });
+
+  it("con validateTrigger 'onChange' el onChange recibe errores FRESCOS tras tipear inválido", () => {
+    const onChange = vi.fn();
+    const store = makeStore({ onChange, config: { validateTrigger: "onChange" } });
+
+    // name requerido sigue vacío; tipear otro campo dispara validate ANTES del onChange →
+    // los errors entregados ya reflejan el requerido faltante. (contrato de createFormStore)
+    store.getState().setValue("age", 7);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const [, errors] = onChange.mock.calls[0];
+    expect(errors).toHaveProperty("name");
+  });
+
+  it("con validateTrigger 'onSubmit' el onChange NO valida en cada tecla (errors {} hasta submit)", async () => {
+    const onChange = vi.fn();
+    const store = makeStore({ onChange, config: { validateTrigger: "onSubmit" } });
+
+    // Sin trigger onChange, setValue NO corre validate → errors quedan en su último valor ({}).
+    store.getState().setValue("age", 7);
+    store.getState().setValue("age", 8);
+
+    expect(onChange).toHaveBeenCalledTimes(2);
+    for (const call of onChange.mock.calls) {
+      expect(call[1]).toEqual({});
+    }
+    expect(store.getState().errors).toEqual({});
+
+    // Recién al hacer submit se valida y aparecen los errores del requerido vacío.
+    await store.getState().submit();
+    expect(store.getState().errors).toHaveProperty("name");
+  });
 });

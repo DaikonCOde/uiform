@@ -48,7 +48,16 @@ export function resolveSections(
     const resolvedNames: string[] = [];
     const resolvedFields: Field[] = [];
 
-    for (const name of ui.fields) {
+    // Guard contra ui:sections malformado: si `fields` no es array, la sección se trata como vacía
+    // (jamás rompemos el render por un uiSchema mal autorado). (REVIEW_V2 resolveSections)
+    const names = Array.isArray(ui.fields) ? ui.fields : [];
+    if (!Array.isArray(ui.fields)) {
+      console.warn(
+        `[resolveSections] La sección "${ui.id}" no trae un array \`fields\`. Se trata como vacía.`
+      );
+    }
+
+    for (const name of names) {
       const field = index[name];
       // Name referenciado que no existe en el schema → avisamos y lo salteamos (no rompemos).
       if (!field) {

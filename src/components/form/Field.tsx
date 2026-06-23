@@ -4,7 +4,6 @@
 import React, { useCallback } from "react";
 
 import { useField } from "../../hooks/useField";
-import { useFormStoreApi } from "../../context/FormStoreContext";
 import {
   FIELD_COMPONENT_MAP,
   CONTAINER_INPUT_TYPES,
@@ -12,15 +11,36 @@ import {
   type FieldComponentMap,
 } from "./fieldComponentMap";
 
+// Props internas del motor (createHeadlessForm) que NO deben llegar al presentacional ni filtrarse al
+// DOM/AntD (causan warnings o pisan props). Centralizado acá: un solo punto de strip para TODOS los
+// campos (los strips locales en fields/* quedan redundantes pero inofensivos). (REVIEW_V2.md §1)
+const ENGINE_ONLY_PROPS = new Set([
+  "type",
+  "jsonType",
+  "_rootLayout",
+  "errorMessage",
+  "computedAttributes",
+  "anyOf",
+  "const",
+  "nameKey", // el motor lo inyecta en fields de items de array → no es prop DOM válida. (probe browser)
+]);
+// NOTA: `isVisible` y `required` figuran en la lista de la tarea pero NO se omiten a propósito: son
+// contrato presentacional vivo. TODO field component hace `if (!isVisible) return null` y usa `required`
+// para FieldLabel/aria-required → omitirlos ocultaría todos los campos. La regla "no omitas nada que un
+// presentacional necesite" manda sobre la lista. (REVIEW_V2.md §1)
+
+/** Quita del field las props internas del motor antes de spreadearlo sobre el presentacional. (REVIEW_V2.md §1) */
+function omitEngineProps(field: Record<string, any>): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const key in field) {
+    if (!ENGINE_ONLY_PROPS.has(key)) clean[key] = field[key];
+  }
+  return clean;
+}
+
 /** Un campo individual: aquí vive la suscripción granular; los presentacionales no tocan el store. */
 export function Field({ name }: { name: string }) {
   const { value, error, touched, onChange, onBlur, field } = useField(name);
-
-  // Ref CRUDA del store (estable, sin suscripción): getFormValues lee on-demand sin re-renderizar.
-  // CLAVE: NO usar un selector que devuelva una función nueva (eso re-renderiza <Field> en cada cambio
-  // del store y mata la suscripción granular del §11.8). (fix de revisión)
-  const store = useFormStoreApi();
-  const getFormValues = useCallback(() => store.getState().values, [store]);
 
   // Adaptadores memoizados: useField ya da onChange/onBlur estables; no los re-envolvemos inline
   // (props frescas cada render romperían el React.memo de los presentacionales). (fix de revisión)
@@ -38,13 +58,12 @@ export function Field({ name }: { name: string }) {
       return (
         <Child
           key={`${childField.name}-${index}`}
-          {...childField}
-          getFormValues={getFormValues}
+          {...omitEngineProps(childField)}
           {...(isContainer ? { renderField } : {})}
         />
       );
     },
-    [getFormValues],
+    [],
   );
 
   if (!field) {
@@ -60,11 +79,10 @@ export function Field({ name }: { name: string }) {
 
   return (
     <Component
-      {...field}
+      {...omitEngineProps(field)}
       value={value}
       error={error}
       touched={touched}
-      getFormValues={getFormValues}
       // Adaptamos el contrato presentacional (onChange(name, value)) al onChange(value) del hook.
       onChange={handleChange}
       onBlur={handleBlur}
