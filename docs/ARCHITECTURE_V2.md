@@ -4,8 +4,13 @@
 > formulario controlado monolítico a un **store headless con suscripción granular** y **renderizado
 > componible por secciones**.
 >
-> Decisiones tomadas (2026-06-22): **Zustand** como store · **`x-jsf-sections`** (array raíz) para
-> secciones · **doc-first** antes de implementar.
+> Decisiones tomadas (2026-06-22): **Zustand** como store · **doc-first** antes de implementar.
+>
+> Decisiones tomadas (2026-06-23): **modelo RJSF de dos documentos** (`schema` + `uiSchema`) como API
+> pública · **`x-jsf-*` queda como lenguaje INTERNO del motor** (no lo escribe el consumidor) · un
+> **compilador `compileUiSchema`** traduce `uiSchema` → `x-jsf-*` antes del `createHeadlessForm` ·
+> **secciones se autoran en el `uiSchema`** (presentación), no en el schema · `ui:widget` resuelve el
+> componente vía `FIELD_COMPONENT_MAP`.
 
 ---
 
@@ -67,10 +72,72 @@ son las decisiones de arquitectura, ya sin la mochila de la compat:
 
 ---
 
+## 1 ter. Modelo de dos documentos (RJSF) + compilador
+
+**Norte (referencia: react-jsonschema-form):** separar QUÉ es el dato de CÓMO se ve.
+
+- **`schema`** (JSON Schema puro): tipos, requeridos, validación. Es el **contrato de datos**; típicamente
+  lo dueña el backend. No lleva presentación.
+- **`uiSchema`** (documento aparte): presentación por campo — `ui:widget` (qué componente renderiza),
+  `ui:placeholder`, `ui:autofocus`, `ui:options`, `ui:order`, y nuestras **secciones**. Es concern del
+  frontend. El mismo `schema` puede tener N `uiSchema` distintos.
+
+### Tensión con el motor (verificada en el fork)
+
+`@laus/json-schema-form` es **single-document**: lee la presentación desde `x-jsf-presentation` DENTRO
+del schema y **splatea todas sus props sobre el field** (`src/field/schema.ts:127`, `src/field/type.ts:4`:
+*"allows for all x-jsf-presentation properties to be splatted"*). No conoce el concepto de `uiSchema`.
+
+### Reconciliación: un compilador, el motor intacto
+
+No reescribimos el motor. Agregamos **una capa** que compila `uiSchema` → `x-jsf-*` y lo mergea al schema
+antes de `createHeadlessForm`. Como el motor splatea todo `x-jsf-presentation` al field, la traducción es
+una **tabla de mapeo**:
+
+```
+schema + uiSchema
+      │
+      ▼  compileUiSchema(schema, uiSchema) → schemaInterno (con x-jsf-*)
+      │     ui:widget       → x-jsf-presentation.inputType   (clave de FIELD_COMPONENT_MAP)
+      │     ui:placeholder  → x-jsf-presentation.placeholder
+      │     ui:autofocus    → x-jsf-presentation.autofocus
+      │     ui:options.{k}  → x-jsf-presentation.{k}         (accept, maxFileSize, async, etc.)
+      │     ui:sections     → x-jsf-sections                (resuelto luego por resolveSections)
+      │     ui:order        → orden dentro de secciones
+      ▼
+createHeadlessForm(schemaInterno)   ← motor SIN cambios
+      ▼
+store + hooks + <Field>/<FormSection>   ← diseño v2 intacto (secciones §6, store §3)
+```
+
+### Decisiones (2026-06-23)
+
+1. **`x-jsf-*` es INTERNO.** El consumidor solo escribe `schema` + `uiSchema`. El `x-jsf-*` es lenguaje
+   del motor que emite el compilador. **No** hay passthrough público de `x-jsf-*` (una sola forma de
+   hacer las cosas; menos superficie de confusión).
+2. **Secciones se autoran en el `uiSchema`** (son presentación pura), p. ej. bajo `ui:sections`. La
+   **maquinaria interna NO cambia**: el compilador las baja a `x-jsf-sections` y `resolveSections` (§6)
+   las resuelve a `ResolvedSection[]` igual que antes. Mantenemos nuestra ventaja sobre RJSF (que no
+   tiene secciones de primera clase) sin contradecir la decisión #1.
+3. **`ui:widget` resuelve el componente** vía `FIELD_COMPONENT_MAP` (+ overrides custom). El `schema`
+   define el TIPO de dato; el `uiSchema` define el COMPONENTE. Si no hay `ui:widget`, se infiere del
+   `type`/`format` del schema (default sensato).
+
+```ts
+// src/store/compileUiSchema.ts — única vía de entrada de presentación.
+function compileUiSchema(schema: JsfObjectSchema, uiSchema: UiSchema): JsfObjectSchema
+```
+
+> **Validación** sigue saliendo del JSON Schema puro (lo más fiel a RJSF). Los mensajes custom
+> (`x-jsf-errorMessage`) son validación-adyacente: se siguen emitiendo internamente (vía `ui:errorMessages`
+> o equivalente) — a decidir en el bloque de validación.
+
+---
+
 ## 2. Vista general
 
 ```
-<FormProvider schema onSubmit onChange asyncLoaders initialValues config>
+<FormProvider schema uiSchema onSubmit onChange asyncLoaders initialValues config>
      │   crea UN store (Zustand) por instancia. El Context solo guarda la REFERENCIA al store
      │   → la referencia es estable → el Context nunca dispara re-renders por sí mismo.
      │
@@ -141,16 +208,19 @@ interface ResolvedSection {
 // src/store/createFormStore.ts
 import { createStore } from 'zustand/vanilla'
 
-export function createFormStore(schema: JsfObjectSchema, opts: FormStoreOptions): StoreApi<FormState> {
-  // 1) Una sola vez: parsear el schema con el motor headless.
-  const { fields, handleValidation, layout } = createHeadlessForm(schema, {
+export function createFormStore(schema: JsfObjectSchema, uiSchema: UiSchema, opts: FormStoreOptions): StoreApi<FormState> {
+  // 0) Compilar uiSchema → x-jsf-* y mergear al schema (única vía de presentación, §1 ter).
+  const internalSchema = compileUiSchema(schema, uiSchema)
+
+  // 1) Una sola vez: parsear el schema (ya con x-jsf-*) con el motor headless.
+  const { fields, handleValidation, layout } = createHeadlessForm(internalSchema, {
     strictInputType: false,
     initialValues: opts.initialValues,
     asyncLoaders: opts.asyncLoaders,
   })
 
-  // 2) Resolver secciones desde x-jsf-sections (ver §6).
-  const sections = resolveSections(schema, fields)
+  // 2) Resolver secciones desde el x-jsf-sections que emitió el compilador (ver §6).
+  const sections = resolveSections(internalSchema, fields)
 
   return createStore<FormState>((set, get) => ({
     fields,
@@ -222,13 +292,13 @@ El Context guarda **solo la referencia al store** (estable) → nunca causa re-r
 // src/context/FormStoreContext.tsx
 const FormStoreContext = createContext<StoreApi<FormState> | null>(null)
 
-export function FormProvider({ schema, children, ...opts }: FormProviderProps) {
+export function FormProvider({ schema, uiSchema = {}, children, ...opts }: FormProviderProps) {
   const storeRef = useRef<StoreApi<FormState>>()
-  // Clave por valor para recrear el store solo si schema/initialValues cambian de verdad.
-  const key = useMemo(() => JSON.stringify({ schema, initialValues: opts.initialValues }), [schema, opts.initialValues])
+  // Clave por valor para recrear el store solo si schema/uiSchema/initialValues cambian de verdad.
+  const key = useMemo(() => JSON.stringify({ schema, uiSchema, initialValues: opts.initialValues }), [schema, uiSchema, opts.initialValues])
   const prevKey = useRef(key)
-  if (!storeRef.current) storeRef.current = createFormStore(schema, opts)
-  if (prevKey.current !== key) { storeRef.current = createFormStore(schema, opts); prevKey.current = key }
+  if (!storeRef.current) storeRef.current = createFormStore(schema, uiSchema, opts)
+  if (prevKey.current !== key) { storeRef.current = createFormStore(schema, uiSchema, opts); prevKey.current = key }
 
   return <FormStoreContext.Provider value={storeRef.current}>{children}</FormStoreContext.Provider>
 }
@@ -287,32 +357,39 @@ el §11.8.**
 
 ---
 
-## 6. Modelo de secciones (`x-jsf-sections`)
+## 6. Modelo de secciones (autoría en `uiSchema`, interno `x-jsf-sections`)
 
-### 6.1 En el JSON
+### 6.1 En el `uiSchema` (lo que escribe el consumidor)
+
+Las secciones son **presentación pura** → viven en el `uiSchema`, NO en el `schema` (que queda como
+contrato de datos limpio). El `schema` solo define `properties`/validación.
 
 ```json
-{
-  "type": "object",
-  "x-jsf-sections": [
-    { "id": "personal", "title": "Datos personales", "description": "...", "fields": ["firstName", "lastName", "email"] },
-    { "id": "address",  "title": "Dirección", "fields": ["street", "city", "zip"] }
-  ],
-  "properties": { "firstName": { ... }, "lastName": { ... }, "email": { ... }, "street": { ... } }
-}
+// schema  (solo dato)            // uiSchema  (solo presentación)
+{ "type": "object",              {
+  "properties": {                  "ui:sections": [
+    "firstName": { "type": "string" },     { "id": "personal", "title": "Datos personales", "fields": ["firstName", "lastName", "email"] },
+    "lastName":  { "type": "string" },     { "id": "address",  "title": "Dirección",        "fields": ["street", "city", "zip"] }
+    "email":     { "type": "string" },   ],
+    "street":    { "type": "string" }    "email":     { "ui:widget": "email", "ui:placeholder": "tu@mail.com" },
+  }                                      "firstName": { "ui:autofocus": true }
+}                                      }
 ```
 
-### 6.2 Resolución (`resolveSections`)
+### 6.2 Compilación + resolución
 
-- La UI lee `x-jsf-sections` del **schema crudo** (la prop), NO del output del engine → el motor no
-  necesita conocer el concepto de secciones (separación limpia).
+- `compileUiSchema` (§1 ter) baja `ui:sections` → `x-jsf-sections` en el `schema` interno. El consumidor
+  **nunca** ve ni escribe `x-jsf-sections`.
+- `resolveSections` lee `x-jsf-sections` del **schema interno** (post-compilación) → el motor sigue sin
+  conocer el concepto de secciones (separación limpia; maquinaria interna SIN cambios respecto al diseño
+  original).
 - Cada `section.fields` (names) se mapea a los `Field` del engine vía `fieldsByName`, preservando orden.
 - Campos que **no** aparecen en ninguna sección → sección implícita `__default__` (se renderiza al
   final en el wrapper `<UIForm>`, o se ignora en modo componible).
 - Si un name referenciado no existe en `properties` → `console.warn` (no romper).
 
 ```ts
-function resolveSections(schema: JsfObjectSchema, fields: Field[]): ResolvedSection[]
+function resolveSections(internalSchema: JsfObjectSchema, fields: Field[]): ResolvedSection[]
 ```
 
 ---
@@ -320,7 +397,7 @@ function resolveSections(schema: JsfObjectSchema, fields: Field[]): ResolvedSect
 ## 7. Componentes
 
 ```tsx
-<FormProvider schema onSubmit onChange asyncLoaders initialValues config>…</FormProvider>
+<FormProvider schema uiSchema onSubmit onChange asyncLoaders initialValues config>…</FormProvider>
 
 // Renderiza los campos de una sección. Render default o custom (render-prop).
 <FormSection id="personal" />
@@ -357,9 +434,9 @@ Azúcar para el caso simple (un form que no necesita layout custom). La **API pr
 componible** (`FormProvider` + `FormSection`/`Field`); `UIForm` existe solo por ergonomía.
 
 ```tsx
-export function UIForm({ schema, children, ...opts }: UIFormProps) {
+export function UIForm({ schema, uiSchema, children, ...opts }: UIFormProps) {
   return (
-    <FormProvider schema={schema} {...opts}>
+    <FormProvider schema={schema} uiSchema={uiSchema} {...opts}>
       <AllSections />                   // renderiza las secciones (o todos los campos si no hay)
       {children ?? <DefaultSubmitBar />}
     </FormProvider>
@@ -395,9 +472,10 @@ export function UIForm({ schema, children, ...opts }: UIFormProps) {
 src/
   store/
     createFormStore.ts       // factory Zustand (vanilla)
-    resolveSections.ts       // x-jsf-sections → ResolvedSection[]
+    compileUiSchema.ts       // uiSchema → x-jsf-* (única vía de presentación, §1 ter)
+    resolveSections.ts       // x-jsf-sections (interno) → ResolvedSection[]
     paths.ts                 // getPath/setPath (reusa setDeep)
-    types.ts                 // FormState, ResolvedSection, FormStoreOptions
+    types.ts                 // FormState, ResolvedSection, UiSchema, FormStoreOptions
   context/
     FormStoreContext.tsx     // Context (store ref) + FormProvider + useFormStore
   hooks/
@@ -436,10 +514,10 @@ acoplados a cada bloque**, no al final.
 
 | Día(s) | Bloque | Entregable |
 |--------|--------|------------|
-| 1 | **Store + Provider** | `createFormStore` (Zustand), `FormStoreContext`, `useFormStore`. Tests del store: values, validate, submit, falsy, anidados. |
-| 1–2 | **Hooks + Field controller** | `useField`, `useWatch`, `useFormApi`. `<Field>` + contrato `FieldComponentProps`. Migrar text/number/select como vertical slice. Test de aislamiento de re-render. |
+| 1 | **Compilador + Store + Provider** | `compileUiSchema` (uiSchema → x-jsf-*, §1 ter) con su tabla de mapeo. `createFormStore` (Zustand), `FormStoreContext`, `useFormStore`. Tests del compilador (widget/placeholder/autofocus/options) y del store: values, validate, submit, falsy, anidados. |
+| 1–2 | **Hooks + Field controller** | `useField`, `useWatch`, `useFormApi`. `<Field>` + contrato `FieldComponentProps`. `ui:widget` → `FIELD_COMPONENT_MAP`. Migrar text/number/select como vertical slice. Test de aislamiento de re-render. |
 | 2–3 | **Migrar todos los campos** | Resto de presentacionales al contrato limpio; simplificar Select/Autocomplete (async vía store, borrar `StableAutocomplete`). |
-| 3–4 | **Secciones** | `x-jsf-sections`, `resolveSections`, `<FormSection>`, `useSection`. Tests de resolución. |
+| 3–4 | **Secciones** | `ui:sections` (autoría en uiSchema) → `resolveSections`, `<FormSection>`, `useSection`. Tests de resolución. |
 | 4 | **UIForm + SubmitButton + responsive** | Atajo `UIForm`, `SubmitButton`, consolidar responsive sobre los generadores del motor (SSR-safe). |
 | 5 | **Limpieza (DROP) + endurecer** | Eliminar `FormContext`/`reduce`/`useFormContext`, CSS duplicado, estado duplicado, `useId()`. Tipos públicos, `npm run build` sanity, playground + docs al día, cobertura de caminos críticos. |
 
