@@ -2,6 +2,11 @@
 
 A React form library built on JSON Schema with Ant Design components and responsive layouts.
 
+> **Status — v2 in active development.** The `schema` + `uiSchema` API below is implemented and
+> verified end-to-end, but the public package exports (`src/lib/index.ts`) are finalized in a later
+> phase. Until then, the live reference is the playground (`src/App.tsx`), runnable with `npm run dev`.
+> See [docs/ROADMAP_V2.md](./docs/ROADMAP_V2.md) for status.
+
 ## Features
 
 - 🎯 **JSON Schema-based**: Define forms using standard JSON Schema
@@ -66,86 +71,55 @@ This library also requires:
 npm install @laus/json-schema-form dayjs
 ```
 
-## Quick Start
+## Two-document model (schema + uiSchema)
 
-```typescript
-import { UIForm } from '@laus/uiform'
+UIForm follows the [RJSF](https://rjsf-team.github.io/react-jsonschema-form) model: a **`schema`** that
+describes the *data* (types, validation) and a separate **`uiSchema`** that describes the *presentation*
+(which widget, placeholder, sections). You never write `x-jsf-*` by hand.
+
+```tsx
+import { FormProvider, Field, useFormApi } from '@laus/uiform'
 import '@laus/uiform/style.css'
-import type { JsfObjectSchema } from '@laus/uiform'
+import { Button } from 'antd'
 
-const schema: JsfObjectSchema = {
-  type: "object",
+// WHAT the data is (validation lives here)
+const schema = {
+  type: 'object',
+  required: ['firstName', 'email'],
   properties: {
-    firstName: {
-      title: "First Name",
-      type: "string",
-      "x-jsf-presentation": {
-        inputType: "text"
-      }
-    },
-    email: {
-      title: "Email",
-      type: "string",
-      format: "email",
-      "x-jsf-presentation": {
-        inputType: "email"
-      }
-    }
+    firstName: { type: 'string', title: 'First name' },
+    email:     { type: 'string', title: 'Email', format: 'email' },
   },
-  required: ["firstName", "email"]
+}
+
+// HOW it looks
+const uiSchema = {
+  firstName: { 'ui:widget': 'text',  'ui:placeholder': 'Jane', 'ui:autofocus': true },
+  email:     { 'ui:widget': 'email', 'ui:placeholder': 'jane@mail.com' },
 }
 
 function MyForm() {
-  const handleSubmit = async (values: any, errors?: any) => {
-    if (!errors || Object.keys(errors).length === 0) {
-      console.log('Form submitted:', values)
-    }
-  }
-
   return (
-    <UIForm
+    <FormProvider
       schema={schema}
-      onSubmit={handleSubmit}
-      config={{
-        layout: 'vertical',
-        size: 'middle'
-      }}
-    />
+      uiSchema={uiSchema}
+      onSubmit={(values) => console.log('valid payload:', values)}
+      config={{ validateTrigger: 'onChange' }}
+    >
+      <Field name="firstName" />
+      <Field name="email" />
+      <SubmitBar />
+    </FormProvider>
   )
 }
-```
 
-## Responsive Layouts
-
-Create responsive forms that adapt to different screen sizes:
-
-```typescript
-const schema: JsfObjectSchema = {
-  type: "object",
-  "x-jsf-layout": {
-    type: "columns",
-    columns: 4,
-    responsive: {
-      sm: 1,  // 1 column on mobile
-      md: 2,  // 2 columns on tablet
-      lg: 4   // 4 columns on desktop
-    }
-  },
-  properties: {
-    title: {
-      title: "Title",
-      type: "string",
-      "x-jsf-layout": {
-        colSpan: {
-          sm: 1,
-          md: 2,
-          lg: 4  // Spans full width on desktop
-        }
-      }
-    }
-  }
+function SubmitBar() {
+  const { submit, isSubmitting } = useFormApi()
+  return <Button type="primary" loading={isSubmitting} onClick={() => submit()}>Submit</Button>
 }
 ```
+
+`onSubmit` receives the JSON payload and is only called when validation passes.
 
 ## Supported Field Types
 
@@ -163,14 +137,14 @@ const schema: JsfObjectSchema = {
 
 ## Documentation
 
-See [LIBRARY_USAGE.md](./LIBRARY_USAGE.md) for comprehensive documentation including:
+See **[docs/USAGE.md](./docs/USAGE.md)** for the full guide:
 
-- Detailed API reference
-- Responsive layout guide
-- Async options loading
-- Validation examples
-- TypeScript usage
-- Advanced features
+- `schema` + `uiSchema` model and the `uiSchema` reference
+- `<FormProvider>` / `<Field>` and the hooks (`useField`, `useWatch`, `useFormApi`, `useAsyncOptions`)
+- Widgets, sections (`ui:sections`), async options, validation
+- Containers (`fieldset`, `group-array`) and granular re-render performance
+
+Internal design docs: [ARCHITECTURE_V2.md](./docs/ARCHITECTURE_V2.md) · [ROADMAP_V2.md](./docs/ROADMAP_V2.md) · [REVIEW_V2.md](./docs/REVIEW_V2.md)
 
 ## Development
 
