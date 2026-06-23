@@ -45,6 +45,7 @@
   "dependencies": {
     "@laus/json-schema-form": "^1.2.4",
     "dayjs": "^1.11.18",
+    "use-sync-external-store": "^1.6.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
