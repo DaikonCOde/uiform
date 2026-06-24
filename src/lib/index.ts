@@ -28,6 +28,8 @@ export type {
   FormState,
   FormStoreOptions,
   AsyncOptionState,
+  FormLayout,
+  ResponsiveCols,
 } from '../store/types'
 
 // ── Tipos de presentación (props de los campos) + config ──

@@ -74,6 +74,9 @@ export function FormProvider({
       get errorMessages() {
         return optsRef.current.errorMessages;
       },
+      get layout() {
+        return optsRef.current.layout;
+      },
       onSubmit: (json, errors) => optsRef.current.onSubmit?.(json, errors),
       onChange: (json, errors) => optsRef.current.onChange?.(json, errors),
     };

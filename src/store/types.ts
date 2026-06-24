@@ -15,6 +15,21 @@ import type { UIFormConfig } from "../types/types.d";
 // El schema define el DATO; el uiSchema define la PRESENTACIÓN. (ARCHITECTURE_V2.md §1 ter)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Columnas responsivas por breakpoint (mobile-first). Un número simple aplica a todos. */
+export interface ResponsiveCols {
+  sm?: number;
+  md?: number;
+  lg?: number;
+  xl?: number;
+}
+
+/** Config de grid: columnas (fijas o responsivas) + gap (default 16px). Global o por sección. */
+export interface FormLayout {
+  columns?: number; // columnas fijas
+  responsive?: ResponsiveCols; // columnas por breakpoint (gana sobre `columns`)
+  gap?: string; // separación entre celdas; default "16px"
+}
+
 /** Presentación de un campo: claves `ui:*` que el compilador baja a x-jsf-presentation. */
 export interface UiFieldOptions {
   "ui:widget"?: string; // componente a renderizar → x-jsf-presentation.inputType (clave de FIELD_COMPONENT_MAP)
@@ -26,6 +41,7 @@ export interface UiFieldOptions {
   "ui:options"?: Record<string, unknown>; // props arbitrarias → splat a x-jsf-presentation (accept, asyncOptions, etc.)
   "ui:order"?: string[]; // orden de hijos en un objeto anidado (fieldset)
   "ui:errorMessages"?: Record<string, string>; // mensajes custom por tipo de validación (required/format/...)
+  "ui:colSpan"?: number | ResponsiveCols; // columnas del grid que ocupa el campo (default 1)
   // Hijos anidados (fieldset): cada clave es el name de un hijo con sus propias UiFieldOptions.
   [childOrUiKey: string]: unknown;
 }
@@ -36,6 +52,7 @@ export interface UiSection {
   title?: string;
   description?: string;
   fields: string[]; // names de los campos, en orden
+  layout?: FormLayout; // grid propio de la sección (override del global)
 }
 
 /** Documento de presentación. `ui:sections` y `ui:order` a nivel raíz; el resto por name de campo. */
@@ -56,6 +73,7 @@ export interface ResolvedSection {
   description?: string;
   fieldNames: string[];
   fields: Field[];
+  layout?: FormLayout; // grid propio de la sección (override del global)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +91,7 @@ export interface AsyncOptionState {
 export interface FormStoreOptions {
   initialValues?: Record<string, any>;
   asyncLoaders?: Record<string, AsyncOptionsLoader>;
+  layout?: FormLayout; // grid GLOBAL del formulario (default de todas las secciones)
   // Mensajes de error globales (i18n): { [tipoDeValidación]: mensaje }. Se aplican a TODOS los campos;
   // un campo puede sobreescribirlos con `ui:errorMessages` en el uiSchema.
   errorMessages?: Record<string, string>;
@@ -87,7 +106,8 @@ export interface FormState {
   fields: Field[];
   fieldsByName: Record<string, Field>; // índice O(1); soporta paths anidados "address.street"
   sections: ResolvedSection[];
-  layout: import("@laus/json-schema-form").JsfLayoutConfig | null;
+  layout: import("@laus/json-schema-form").JsfLayoutConfig | null; // x-jsf-layout del motor (interno)
+  formLayout: FormLayout | null; // grid GLOBAL provisto por el consumidor (FormProvider.layout)
 
   // ── Estado mutable ──
   values: Record<string, any>;

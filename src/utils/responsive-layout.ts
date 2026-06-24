@@ -11,6 +11,12 @@ const BREAKPOINTS = {
   xl: "1280px",
 };
 
+// Sanitiza a entero >= 1 (input del consumidor: 0/negativo/no-entero → 1, evita CSS basura). (revisión grid)
+function posInt(n: unknown): number {
+  const v = Math.floor(Number(n));
+  return Number.isFinite(v) && v >= 1 ? v : 1;
+}
+
 /** Genera el CSS Grid del contenedor (columnas fijas o responsivas) para una clase dada. */
 export function generateContainerResponsiveCSS(
   containerLayout: any,
@@ -21,22 +27,24 @@ export function generateContainerResponsiveCSS(
 
   let css = `.${className} {\n  display: grid;\n  gap: ${gap ?? "16px"};\n`;
 
-  // Sin config responsiva → columnas fijas.
+  // Sin config responsiva → columnas fijas (1 por default).
   if (!responsive) {
-    css += `  grid-template-columns: repeat(${columns || 1}, 1fr);\n}\n`;
+    css += `  grid-template-columns: repeat(${posInt(columns)}, 1fr);\n}\n`;
     return css;
   }
 
   css += "}\n";
 
-  // Mobile-first: la sm va sin media query; el resto con min-width.
+  // Mobile-first: la sm va sin media query; el resto con min-width. Si NO se especifica `sm` pero hay
+  // responsive, la base cae a 1 columna (sin esto el móvil quedaba sin grid-template-columns). (revisión grid)
   Object.entries(BREAKPOINTS).forEach(([breakpoint, minWidth]) => {
-    const cols = responsive[breakpoint as keyof typeof responsive];
+    const raw = responsive[breakpoint as keyof typeof responsive];
+    const cols = raw === undefined ? (breakpoint === "sm" ? 1 : undefined) : raw;
     if (cols === undefined) return;
     if (breakpoint === "sm" || minWidth === "0px") {
-      css += `.${className} {\n  grid-template-columns: repeat(${cols}, 1fr);\n}\n`;
+      css += `.${className} {\n  grid-template-columns: repeat(${posInt(cols)}, 1fr);\n}\n`;
     } else {
-      css += `@media (min-width: ${minWidth}) {\n  .${className} {\n    grid-template-columns: repeat(${cols}, 1fr);\n  }\n}\n`;
+      css += `@media (min-width: ${minWidth}) {\n  .${className} {\n    grid-template-columns: repeat(${posInt(cols)}, 1fr);\n  }\n}\n`;
     }
   });
 
@@ -51,7 +59,7 @@ export function generateFieldResponsiveCSS(field: any, className: string): strin
   const colSpan = fieldLayout.colSpan;
 
   if (typeof colSpan === "number") {
-    return `.${className} {\n  grid-column: span ${colSpan};\n}\n`;
+    return `.${className} {\n  grid-column: span ${posInt(colSpan)};\n}\n`;
   }
   if (typeof colSpan !== "object") return "";
 
@@ -60,9 +68,9 @@ export function generateFieldResponsiveCSS(field: any, className: string): strin
     const span = (colSpan as any)[breakpoint];
     if (span === undefined) return;
     if (breakpoint === "sm" || minWidth === "0px") {
-      css += `.${className} {\n  grid-column: span ${span};\n}\n`;
+      css += `.${className} {\n  grid-column: span ${posInt(span)};\n}\n`;
     } else {
-      css += `@media (min-width: ${minWidth}) {\n  .${className} {\n    grid-column: span ${span};\n  }\n}\n`;
+      css += `@media (min-width: ${minWidth}) {\n  .${className} {\n    grid-column: span ${posInt(span)};\n  }\n}\n`;
     }
   });
   return css;

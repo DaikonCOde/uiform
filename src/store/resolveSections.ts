@@ -77,6 +77,7 @@ export function resolveSections(
       description: ui.description,
       fieldNames: resolvedNames,
       fields: resolvedFields,
+      layout: ui.layout, // grid propio de la sección (override del global)
     });
   }
 

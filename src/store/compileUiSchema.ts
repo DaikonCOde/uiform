@@ -121,6 +121,15 @@ function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
     };
   }
 
+  // ui:colSpan → x-jsf-layout.colSpan: columnas del grid que ocupa el campo. El motor lo surfacea como
+  // field.layout.colSpan y generateFieldResponsiveCSS lo usa para `grid-column: span N`. (grid responsivo)
+  if (ui["ui:colSpan"] !== undefined) {
+    prop["x-jsf-layout"] = {
+      ...((prop["x-jsf-layout"] as Record<string, unknown>) ?? {}),
+      colSpan: ui["ui:colSpan"],
+    };
+  }
+
   // Recursión en contenedores: las claves no-ui:* del entry son names de hijos con sus UiFieldOptions. (§1 ter punto 3)
   // fieldset → prop.properties; group-array → prop.items.properties. (fix de revisión: items de arrays)
   const childProps =

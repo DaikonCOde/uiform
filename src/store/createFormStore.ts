@@ -56,6 +56,7 @@ export function createFormStore(
     fieldsByName: indexByName(fields),
     sections,
     layout: layout ?? null,
+    formLayout: opts.layout ?? null,
 
     // ── Estado mutable ──
     values: getDefaultValuesFromFields(fields, opts.initialValues),
