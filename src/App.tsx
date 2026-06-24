@@ -4,12 +4,16 @@ import esES from 'antd/locale/es_ES'
 import 'dayjs/locale/es'
 import './App.css'
 
-import type { JsfObjectSchema } from '@laus/json-schema-form'
-import { FormProvider, useFormStore } from './context/FormStoreContext'
-import { Field } from './components/form/Field'
-import { useFormApi } from './hooks/useFormApi'
-import type { UiSchema } from './store/types'
-import type { AsyncOptionsLoader } from './types'
+// Consumimos la API PÚBLICA (@laus/uiform) — en dev, el alias de Vite la mapea a src/lib/index.ts.
+import {
+  FormProvider,
+  FormSection,
+  SubmitButton,
+  useFormStore,
+  useFormApi,
+  useSections,
+} from '@laus/uiform'
+import type { JsfObjectSchema, UiSchema, AsyncOptionsLoader } from '@laus/uiform'
 
 /**
  * Playground de verificación de UIForm v2 (Fases 1-4).
@@ -60,12 +64,12 @@ const schema: JsfObjectSchema = {
 // ── 2) uiSchema (presentación RJSF): widget, placeholder, autofocus, async y SECCIONES ──
 const uiSchema: UiSchema = {
   'ui:sections': [
-    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad'] },
+    { id: 'datos', title: 'Datos personales xd', fields: ['nombre', 'email', 'edad'] },
     { id: 'extra', title: 'Información adicional', fields: ['pais', 'ciudad', 'nacimiento', 'bio', 'acepta'] },
     { id: 'avanzado', title: 'Contenedores (fieldset + group-array)', fields: ['direccion', 'contactos'] },
   ],
   nombre: { 'ui:widget': 'text', 'ui:placeholder': 'Tu nombre', 'ui:autofocus': true },
-  email: { 'ui:widget': 'email', 'ui:placeholder': 'tu@mail.com' },
+  email: { 'ui:widget': 'email', 'ui:placeholder': 'tu@mail.com', 'ui:errorMessages': { format: 'Ingresá un email válido' } },
   edad: { 'ui:widget': 'number', 'ui:placeholder': '0' },
   pais: { 'ui:widget': 'select', 'ui:options': { asyncOptions: { id: 'paises' } } },
   ciudad: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá tu ciudad...', 'ui:options': { asyncOptions: { id: 'ciudades', searchable: true } } },
@@ -82,6 +86,15 @@ const uiSchema: UiSchema = {
     nombre: { 'ui:widget': 'text' },
     telefono: { 'ui:widget': 'text' },
   },
+}
+
+// ── 2b) errorMessages: mensajes de validación globales (i18n) en español. Un campo puede
+//        sobreescribirlos con `ui:errorMessages` (ver email). ──
+const errorMessages: Record<string, string> = {
+  required: 'Este campo es obligatorio',
+  format: 'El formato no es válido',
+  type: 'El valor no es del tipo esperado',
+  minimum: 'El valor es demasiado bajo',
 }
 
 // ── 3) asyncLoaders: opciones del Select cargadas async desde el store ──
@@ -110,20 +123,12 @@ const asyncLoaders: Record<string, AsyncOptionsLoader> = {
 
 /** Renderiza el formulario por secciones, leyendo la metadata resuelta del store. */
 function FormBody() {
-  // Suscripción a las secciones (metadata estructural, no cambia al tipear).
-  const sections = useFormStore((s) => s.sections)
-
+  // Render por secciones usando el componente público <FormSection> (su default arma título + campos).
+  const sections = useSections()
   return (
     <>
       {sections.map((section) => (
-        <section key={section.id} style={{ marginBottom: 24 }}>
-          {section.title && <h3 style={{ marginBottom: 12 }}>{section.title}</h3>}
-          <div style={{ display: 'grid', gap: 12 }}>
-            {section.fieldNames.map((name) => (
-              <Field key={name} name={name} />
-            ))}
-          </div>
-        </section>
+        <FormSection key={section.id} id={section.id} />
       ))}
     </>
   )
@@ -131,12 +136,10 @@ function FormBody() {
 
 /** Botón de submit cableado al store vía useFormApi (acciones estables + flags). */
 function SubmitBar() {
-  const { submit, reset, isSubmitting } = useFormApi()
+  const { reset } = useFormApi()
   return (
     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-      <Button type="primary" loading={isSubmitting} onClick={() => submit()}>
-        Enviar
-      </Button>
+      <SubmitButton>Enviar</SubmitButton>
       <Button onClick={() => reset()}>Reset</Button>
       <span style={{ alignSelf: 'center', color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>
         onSubmit imprime el payload JSON en el panel derecho
@@ -186,7 +189,8 @@ function App() {
           schema={schema}
           uiSchema={uiSchema}
           asyncLoaders={asyncLoaders}
-          config={{ validateTrigger: 'onChange' }}
+          errorMessages={errorMessages}
+          config={{ validateTrigger: 'onSubmit' }}
           onSubmit={(json) => setSubmitted(json)}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>

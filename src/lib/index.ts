@@ -1,11 +1,37 @@
-// Main component export
-export { UIForm } from '../components/form/UIForm'
-export { default as UIFormDefault } from '../components/form/UIForm'
+// Punto de entrada público de @laus/uiform (API v2).
+// Modelo de dos documentos: schema (dato) + uiSchema (presentación). Ver docs/usage/index.md.
 
-// Type exports
+// ── Componentes ──
+export { FormProvider, useFieldComponents } from '../context/FormStoreContext'
+export type { FormProviderProps, FieldComponents } from '../context/FormStoreContext'
+export { Field } from '../components/form/Field'
+export { FormSection } from '../components/form/FormSection'
+export { SubmitButton } from '../components/form/SubmitButton'
+export { UIForm, default as UIFormDefault } from '../components/form/UIForm'
+export type { UIFormProps } from '../components/form/UIForm'
+
+// ── Hooks ──
+export { useFormStore, useFormStoreApi } from '../context/FormStoreContext'
+export { useField } from '../hooks/useField'
+export { useWatch } from '../hooks/useWatch'
+export { useFormApi } from '../hooks/useFormApi'
+export { useAsyncOptions } from '../hooks/useAsyncOptions'
+export { useSection } from '../hooks/useSection'
+export { useSections } from '../hooks/useSections'
+
+// ── Tipos del store/uiSchema ──
 export type {
-  UIFormProps,
-  UIFormConfig,
+  UiSchema,
+  UiFieldOptions,
+  UiSection,
+  ResolvedSection,
+  FormState,
+  FormStoreOptions,
+  AsyncOptionState,
+} from '../store/types'
+
+// ── Tipos de presentación (props de los campos) + config ──
+export type {
   BaseFieldProps,
   TextFieldProps,
   NumberFieldProps,
@@ -20,20 +46,10 @@ export type {
   GroupArrayFieldProps,
   FieldProps,
   FieldOption,
-  AsyncOptionsLoader,
+  UIFormConfig,
 } from '../types'
 
-// Context exports
-export { FormProvider, FormContext } from '../context/FormContext'
-export type { FormContextState, FormContextValue, AsyncOptionsCache } from '../context/FormContext'
-
-// Hook exports
-export { useFormContext } from '../hooks/useFormContext'
-
-// Utility exports (optional, but can be useful)
-export { formValuesToJsonValues, getDefaultValuesFromFields } from '../utils/utils'
-
-// Field components (optional, for advanced customization)
+// ── Componentes de campo (para override / customización avanzada) ──
 export {
   TextField,
   NumberField,
@@ -47,17 +63,22 @@ export {
   FieldsetField,
   GroupArrayField,
 } from '../components/fields'
+export { FIELD_COMPONENT_MAP } from '../components/form/fieldComponentMap'
 
-// Re-export commonly used types from json-schema-form
+// ── Utilidades ──
+export { formValuesToJsonValues, getDefaultValuesFromFields } from '../utils/utils'
+
+// ── Re-export de tipos del motor (Field se re-exporta como FieldDef para no chocar con el componente Field) ──
 export type {
-  Field,
+  Field as FieldDef,
   JsfObjectSchema,
+  JsfLayoutConfig,
   AsyncOptionsConfig,
+  AsyncOptionsLoader,
   AsyncOptionsLoaderContext,
   AsyncOptionsLoaderResult,
-  JsfLayoutConfig,
   ResponsiveBreakpoints,
+  FormErrors,
 } from '@laus/json-schema-form'
 
-// CSS - users will need to import this separately
-// import '@yourorg/uiform/dist/style.css'
+// CSS: importar por separado → import '@laus/uiform/style.css'

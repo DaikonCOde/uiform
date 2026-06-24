@@ -4,6 +4,7 @@
 import React, { useCallback } from "react";
 
 import { useField } from "../../hooks/useField";
+import { useFieldComponents } from "../../context/FormStoreContext";
 import {
   FIELD_COMPONENT_MAP,
   CONTAINER_INPUT_TYPES,
@@ -42,18 +43,26 @@ function omitEngineProps(field: Record<string, any>): Record<string, any> {
 export function Field({ name }: { name: string }) {
   const { value, error, touched, onChange, onBlur, field } = useField(name);
 
+  // Registry de widgets custom de esta instancia: el override gana al mapa default. (fix casos de uso: widgets)
+  const components = useFieldComponents();
+  const resolve = useCallback(
+    (inputType: string): React.ComponentType<any> =>
+      (components[inputType] ??
+        FIELD_COMPONENT_MAP[inputType as keyof FieldComponentMap] ??
+        Fallback) as React.ComponentType<any>,
+    [components],
+  );
+
   // Adaptadores memoizados: useField ya da onChange/onBlur estables; no los re-envolvemos inline
   // (props frescas cada render romperían el React.memo de los presentacionales). (fix de revisión)
   const handleChange = useCallback((_n: string, v: any) => onChange(v), [onChange]);
   const handleBlur = useCallback(() => onBlur(), [onBlur]);
 
   // renderField: hijos de un contenedor ya vienen cableados (value/onChange/name prefijado) → solo
-  // resolvemos el componente y lo renderizamos CONTROLADO, preservando el contrato v1. (ARCHITECTURE_V2.md §13.1)
+  // resolvemos el componente (respetando el registry custom) y lo renderizamos CONTROLADO. (ARCHITECTURE_V2.md §13.1)
   const renderField = useCallback(
     (childField: any, index: number): React.ReactNode => {
-      const Child = (FIELD_COMPONENT_MAP[
-        childField.inputType as keyof FieldComponentMap
-      ] ?? Fallback) as React.ComponentType<any>;
+      const Child = resolve(childField.inputType);
       const isContainer = CONTAINER_INPUT_TYPES.has(childField.inputType);
       return (
         <Child
@@ -63,18 +72,16 @@ export function Field({ name }: { name: string }) {
         />
       );
     },
-    [],
+    [resolve],
   );
 
   if (!field) {
     return <Fallback inputType="undefined" name={name} />;
   }
 
-  // El union de todos los componentes de campo colapsa sus props a `never`; casteamos a un
-  // componente de props abiertas (el contrato real lo garantiza useField + el field del motor).
-  const Component = (FIELD_COMPONENT_MAP[
-    field.inputType as keyof FieldComponentMap
-  ] ?? Fallback) as React.ComponentType<any>;
+  // El union de todos los componentes de campo colapsa sus props a `never`; resolve() devuelve uno de
+  // props abiertas (el contrato real lo garantiza useField + el field del motor).
+  const Component = resolve(field.inputType);
   const isContainer = CONTAINER_INPUT_TYPES.has(field.inputType);
 
   return (

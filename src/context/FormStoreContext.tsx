@@ -5,6 +5,7 @@ import {
   useContext,
   useMemo,
   useRef,
+  type ComponentType,
   type ReactNode,
 } from "react";
 // Zustand 5 quitó el arg de igualdad de `useStore`; el idiom v5 con equalityFn opcional vive en /traditional.
@@ -19,13 +20,25 @@ import type {
   UiSchema,
 } from "../store/types";
 
+/** Registry de componentes custom por `ui:widget`/inputType: el consumidor reemplaza/agrega widgets. */
+export type FieldComponents = Partial<Record<string, ComponentType<any>>>;
+
 // El valor del Context es la ref al store (no el estado): así el Context nunca dispara re-renders. (§4)
 const FormStoreContext = createContext<StoreApi<FormState> | null>(null);
+// Registry de componentes custom (vacío por default). Lo lee el controlador <Field>. (fix casos de uso: widgets)
+const FieldComponentsContext = createContext<FieldComponents>({});
 
-/** Props del Provider: los dos documentos (schema + uiSchema) y las opciones del store. */
+/** Devuelve el registry de componentes custom de esta instancia (los que NO se pasan caen al mapa default). */
+export function useFieldComponents(): FieldComponents {
+  return useContext(FieldComponentsContext);
+}
+
+/** Props del Provider: los dos documentos (schema + uiSchema), las opciones del store y widgets custom. */
 export interface FormProviderProps extends FormStoreOptions {
   schema: JsfObjectSchema;
   uiSchema?: UiSchema;
+  /** Componentes custom por inputType/ui:widget (override del mapa default; también valen en contenedores). */
+  components?: FieldComponents;
   children: ReactNode;
 }
 
@@ -33,6 +46,7 @@ export interface FormProviderProps extends FormStoreOptions {
 export function FormProvider({
   schema,
   uiSchema = {},
+  components,
   children,
   ...opts
 }: FormProviderProps) {
@@ -57,16 +71,21 @@ export function FormProvider({
       get asyncLoaders() {
         return optsRef.current.asyncLoaders;
       },
+      get errorMessages() {
+        return optsRef.current.errorMessages;
+      },
       onSubmit: (json, errors) => optsRef.current.onSubmit?.(json, errors),
       onChange: (json, errors) => optsRef.current.onChange?.(json, errors),
     };
   }
   const stableOpts = stableOptsRef.current;
 
-  // Key por valor: recrear el store solo si schema/uiSchema/initialValues cambian de verdad (no por refs nuevas). (§4, riesgo #3)
+  // Key por valor: recrear el store SOLO si cambia schema/uiSchema. initialValues NO va en la key a
+  // propósito: si fuera, un fetch de edición que llega tarde recrearía el store y borraría lo que el
+  // usuario tipeó. Para cargar datos async usá `hydrate()`. (fix casos de uso: edición async)
   const key = useMemo(
-    () => JSON.stringify({ schema, uiSchema, initialValues: opts.initialValues }),
-    [schema, uiSchema, opts.initialValues],
+    () => JSON.stringify({ schema, uiSchema }),
+    [schema, uiSchema],
   );
   const prevKey = useRef(key);
 
@@ -77,9 +96,14 @@ export function FormProvider({
     prevKey.current = key;
   }
 
+  // Registry estable: si components no cambia de contenido, el Provider de contexto no re-renderiza hijos.
+  const componentsValue = useMemo(() => components ?? {}, [components]);
+
   return (
     <FormStoreContext.Provider value={storeRef.current}>
-      {children}
+      <FieldComponentsContext.Provider value={componentsValue}>
+        {children}
+      </FieldComponentsContext.Provider>
     </FormStoreContext.Provider>
   );
 }

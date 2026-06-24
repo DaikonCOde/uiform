@@ -116,6 +116,59 @@ describe("createFormStore", () => {
     expect(store.getState().errors).toHaveProperty("name");
   });
 
+  it("setValues hace MERGE (no replace) sobre los valores actuales", () => {
+    const store = makeStore();
+    store.getState().setValue("name", "Ada");
+    store.getState().setValues({ age: 99 });
+    const v = store.getState().values;
+    expect(v.age).toBe(99);
+    expect(v.name).toBe("Ada"); // NO se borró (merge, no replace)
+  });
+
+  it("hydrate carga datos async SIN pisar lo que el usuario ya tocó", () => {
+    const store = makeStore();
+    // El usuario edita 'name' y lo marca como tocado (onBlur).
+    store.getState().setValue("name", "Editado");
+    store.getState().setTouched("name");
+    // Llega la data del servidor (tarde) para name + age.
+    store.getState().hydrate({ name: "DelServidor", age: 50 });
+    const v = store.getState().values;
+    expect(v.name).toBe("Editado"); // tocado → se respeta lo del usuario
+    expect(v.age).toBe(50); // no tocado → se hidrata
+  });
+
+  it("submit captura en submitError lo que tira onSubmit (sin re-lanzar)", async () => {
+    const onSubmit = vi.fn(() => {
+      throw new Error("falló el guardado");
+    });
+    const store = makeStore({ onSubmit });
+    store.getState().setValue("name", "Ada"); // form válido → onSubmit corre
+    await store.getState().submit();
+    expect(store.getState().submitError).toBe("falló el guardado");
+    expect(store.getState().isSubmitting).toBe(false); // finally siempre apaga el flag
+  });
+
+  it("errorMessages global aplica a campos sin override (i18n)", () => {
+    const s = {
+      type: "object",
+      required: ["x"],
+      properties: { x: { type: "string", "x-jsf-presentation": { inputType: "text" } } },
+    } as JsfObjectSchema;
+    const store = createFormStore(s, undefined, { errorMessages: { required: "Obligatorio" } });
+    expect(store.getState().validate().x).toBe("Obligatorio");
+  });
+
+  it("ui:errorMessages por campo PISA al global", () => {
+    const s = {
+      type: "object",
+      required: ["x"],
+      properties: { x: { type: "string", "x-jsf-presentation": { inputType: "text" } } },
+    } as JsfObjectSchema;
+    const ui = { x: { "ui:errorMessages": { required: "Falta este!" } } } as any;
+    const store = createFormStore(s, ui, { errorMessages: { required: "Obligatorio" } });
+    expect(store.getState().validate().x).toBe("Falta este!");
+  });
+
   it("con validateTrigger 'onChange' el onChange recibe errores FRESCOS tras tipear inválido", () => {
     const onChange = vi.fn();
     const store = makeStore({ onChange, config: { validateTrigger: "onChange" } });
@@ -129,21 +182,20 @@ describe("createFormStore", () => {
     expect(errors).toHaveProperty("name");
   });
 
-  it("con validateTrigger 'onSubmit' el onChange NO valida en cada tecla (errors {} hasta submit)", async () => {
+  it("con validateTrigger 'onSubmit': onChange recibe errores FRESCOS, pero store.errors no se muestra hasta submit", async () => {
     const onChange = vi.fn();
     const store = makeStore({ onChange, config: { validateTrigger: "onSubmit" } });
 
-    // Sin trigger onChange, setValue NO corre validate → errors quedan en su último valor ({}).
     store.getState().setValue("age", 7);
-    store.getState().setValue("age", 8);
 
-    expect(onChange).toHaveBeenCalledTimes(2);
-    for (const call of onChange.mock.calls) {
-      expect(call[1]).toEqual({});
-    }
+    // onChange SIEMPRE recibe errores frescos: validamos en cada cambio para re-derivar visibilidad,
+    // y de paso el consumidor puede "deshabilitar submit si inválido" sin activar validateTrigger:'onChange'.
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][1]).toHaveProperty("name");
+    // Pero store.errors (lo que se MUESTRA en la UI) sigue {} hasta submit, por el trigger onSubmit.
     expect(store.getState().errors).toEqual({});
 
-    // Recién al hacer submit se valida y aparecen los errores del requerido vacío.
+    // Recién al hacer submit se publican los errores del requerido vacío.
     await store.getState().submit();
     expect(store.getState().errors).toHaveProperty("name");
   });

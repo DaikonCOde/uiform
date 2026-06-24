@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Card, Button, Space, Popconfirm } from 'antd'
-import { PlusOutlined, DeleteOutlined, DragOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { ErrorMessage, FieldLabel } from '../commons'
 import type { GroupArrayFieldProps } from '../../types'
 import styles from './Field.module.css'
@@ -31,14 +31,12 @@ export function GroupArrayField({
   addButtonText = 'Add Item',
   deleteButtonText = 'Delete',
   confirmDelete = true,
-  allowReorder = false,
 }: GroupArrayFieldPropsExtended & {
   minItems?: number
   maxItems?: number
   addButtonText?: string
   deleteButtonText?: string
   confirmDelete?: boolean
-  allowReorder?: boolean
 }) {
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
@@ -128,9 +126,6 @@ export function GroupArrayField({
                 title={
                   <div className={styles.arrayItemHeader}>
                     <Space>
-                      {allowReorder && (
-                        <DragOutlined style={{ cursor: 'grab', color: 'rgba(0, 0, 0, 0.45)' }} />
-                      )}
                       <span>Item {index + 1}</span>
                     </Space>
                     

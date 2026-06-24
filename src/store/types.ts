@@ -25,6 +25,7 @@ export interface UiFieldOptions {
   "ui:description"?: string;
   "ui:options"?: Record<string, unknown>; // props arbitrarias → splat a x-jsf-presentation (accept, asyncOptions, etc.)
   "ui:order"?: string[]; // orden de hijos en un objeto anidado (fieldset)
+  "ui:errorMessages"?: Record<string, string>; // mensajes custom por tipo de validación (required/format/...)
   // Hijos anidados (fieldset): cada clave es el name de un hijo con sus propias UiFieldOptions.
   [childOrUiKey: string]: unknown;
 }
@@ -72,6 +73,9 @@ export interface AsyncOptionState {
 export interface FormStoreOptions {
   initialValues?: Record<string, any>;
   asyncLoaders?: Record<string, AsyncOptionsLoader>;
+  // Mensajes de error globales (i18n): { [tipoDeValidación]: mensaje }. Se aplican a TODOS los campos;
+  // un campo puede sobreescribirlos con `ui:errorMessages` en el uiSchema.
+  errorMessages?: Record<string, string>;
   onSubmit?: (values: any, errors?: FormErrors) => void | Promise<void>;
   onChange?: (values: any, errors?: FormErrors) => void;
   config?: UIFormConfig;
@@ -91,13 +95,15 @@ export interface FormState {
   touched: Record<string, boolean>;
   submitted: boolean;
   isSubmitting: boolean;
+  submitError: string | null; // error que tiró onSubmit (para feedback); null si no hubo.
 
   // ── Cache de opciones async (reemplaza asyncOptionsCache del contexto v1) ──
   async: Record<string, AsyncOptionState>;
 
   // ── Acciones (referencias estables) ──
   setValue: (name: string, value: any) => void; // soporta paths: "address.street"
-  setValues: (values: Record<string, any>) => void;
+  setValues: (values: Record<string, any>) => void; // MERGE parcial sobre los valores actuales
+  hydrate: (values: Record<string, any>) => void; // carga datos (edición async) sin pisar lo que el usuario tocó
   setTouched: (name: string) => void;
   validate: () => FormErrors;
   submit: () => Promise<void>;

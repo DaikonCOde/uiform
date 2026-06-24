@@ -13,43 +13,71 @@ import type { UiSchema, UiFieldOptions, UiSection } from "./types";
 export function compileUiSchema(
   schema: JsfObjectSchema,
   uiSchema?: UiSchema,
+  // Mensajes de error globales (i18n): { [tipoDeValidación]: mensaje }. Se inyectan en TODOS los campos.
+  defaultErrorMessages?: Record<string, string>,
 ): JsfObjectSchema {
   // Clon profundo: la inmutabilidad del input es invariante del compilador. (ARCHITECTURE_V2.md §1 ter, decisión #1)
   const out = structuredClone(schema);
 
-  if (!uiSchema || Object.keys(uiSchema).length === 0) return out;
+  const hasUi = !!uiSchema && Object.keys(uiSchema).length > 0;
+  const hasDefaults =
+    !!defaultErrorMessages && Object.keys(defaultErrorMessages).length > 0;
+  if (!hasUi && !hasDefaults) return out;
 
-  // Raíz: secciones y orden son presentación pura → viven en el uiSchema y bajan a x-jsf-*. (§1 ter, decisión #2)
-  if (uiSchema["ui:sections"] !== undefined) {
-    // x-jsf-sections es desconocido para el motor (lo ignora); lo lee luego resolveSections (§6).
-    (out as Record<string, unknown>)["x-jsf-sections"] =
-      uiSchema["ui:sections"] as UiSection[];
-  }
-  if (uiSchema["ui:order"] !== undefined) {
-    out["x-jsf-order"] = uiSchema["ui:order"] as string[];
-  }
-
-  const properties = out.properties;
-
-  // Por campo: cada clave no-raíz del uiSchema debe corresponder a una property del schema.
-  for (const key of Object.keys(uiSchema)) {
-    if (key === "ui:sections" || key === "ui:order") continue;
-
-    if (!properties || !(key in properties)) {
-      // Robustez: referencia colgada → avisar y seguir, nunca romper el compilado. (§1 ter robustez)
-      console.warn(
-        `[compileUiSchema] uiSchema referencia "${key}", que no existe en schema.properties. Se ignora.`,
-      );
-      continue;
+  if (hasUi) {
+    // Raíz: secciones y orden son presentación pura → viven en el uiSchema y bajan a x-jsf-*. (§1 ter, decisión #2)
+    if (uiSchema!["ui:sections"] !== undefined) {
+      // x-jsf-sections es desconocido para el motor (lo ignora); lo lee luego resolveSections (§6).
+      (out as Record<string, unknown>)["x-jsf-sections"] =
+        uiSchema!["ui:sections"] as UiSection[];
+    }
+    if (uiSchema!["ui:order"] !== undefined) {
+      out["x-jsf-order"] = uiSchema!["ui:order"] as string[];
     }
 
-    const fieldUi = uiSchema[key] as UiFieldOptions | undefined;
-    if (!fieldUi) continue;
+    const properties = out.properties;
 
-    compileField(properties[key] as JsfObjectSchema, fieldUi);
+    // Por campo: cada clave no-raíz del uiSchema debe corresponder a una property del schema.
+    for (const key of Object.keys(uiSchema!)) {
+      if (key === "ui:sections" || key === "ui:order") continue;
+
+      if (!properties || !(key in properties)) {
+        // Robustez: referencia colgada → avisar y seguir, nunca romper el compilado. (§1 ter robustez)
+        console.warn(
+          `[compileUiSchema] uiSchema referencia "${key}", que no existe en schema.properties. Se ignora.`,
+        );
+        continue;
+      }
+
+      const fieldUi = uiSchema![key] as UiFieldOptions | undefined;
+      if (!fieldUi) continue;
+
+      compileField(properties[key] as JsfObjectSchema, fieldUi);
+    }
+  }
+
+  // Mensajes globales: se inyectan en cada property (incl. anidadas); los por-campo (ui:errorMessages) ganan.
+  if (hasDefaults) {
+    injectDefaultErrorMessages(out.properties, defaultErrorMessages!);
   }
 
   return out;
+}
+
+/** Inyecta mensajes de error globales (i18n) en el x-jsf-errorMessage de cada property; los por-campo ganan. */
+function injectDefaultErrorMessages(
+  properties: Record<string, any> | undefined,
+  defaults: Record<string, string>,
+): void {
+  if (!properties) return;
+  for (const key of Object.keys(properties)) {
+    const prop = properties[key];
+    if (typeof prop !== "object" || prop === null) continue;
+    // `{ ...defaults, ...existing }` → lo por-campo (ya seteado por compileField) pisa al global.
+    prop["x-jsf-errorMessage"] = { ...defaults, ...(prop["x-jsf-errorMessage"] ?? {}) };
+    if (prop.properties) injectDefaultErrorMessages(prop.properties, defaults); // fieldset
+    if (prop.items?.properties) injectDefaultErrorMessages(prop.items.properties, defaults); // group-array
+  }
 }
 
 /** Baja las claves ui:* de un campo a su x-jsf-presentation (con uiSchema teniendo precedencia) y recurse en fieldsets. */
@@ -83,6 +111,15 @@ function compileField(prop: JsfObjectSchema, ui: UiFieldOptions): void {
 
   // ui:order ordena los hijos de un fieldset → x-jsf-order de la property objeto.
   if (ui["ui:order"] !== undefined) prop["x-jsf-order"] = ui["ui:order"];
+
+  // ui:errorMessages → x-jsf-errorMessage del campo: mensajes custom por tipo de validación
+  // (required/format/minimum/...). El motor los aplica en form.ts:applyCustomErrorMessages. (fix casos de uso)
+  if (ui["ui:errorMessages"]) {
+    prop["x-jsf-errorMessage"] = {
+      ...((prop["x-jsf-errorMessage"] as Record<string, string>) ?? {}),
+      ...(ui["ui:errorMessages"] as Record<string, string>),
+    };
+  }
 
   // Recursión en contenedores: las claves no-ui:* del entry son names de hijos con sus UiFieldOptions. (§1 ter punto 3)
   // fieldset → prop.properties; group-array → prop.items.properties. (fix de revisión: items de arrays)

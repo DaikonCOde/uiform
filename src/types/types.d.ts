@@ -112,18 +112,5 @@ export interface UIFormConfig {
   disabled?: boolean
 }
 
-// Tipo para async loaders
-export type AsyncOptionsLoader = (context: any) => Promise<{ options: any[] }>
-
-// Props del componente principal JForm
-export interface UIFormProps {
-  schema: any // JsfObjectSchema from json-schema-form
-  formId?: string // ID del formulario para vincular con botones externos
-  initialValues?: Record<string, any>
-  asyncLoaders?: Record<string, AsyncOptionsLoader> // Mapeador de funciones async
-  onSubmit?: (values: any, errors?: any) => void | Promise<void>
-  onChange?: (values: any, errors?: any) => void
-  config?: UIFormConfig
-  className?: string
-  style?: React.CSSProperties
-}
+// NOTA: AsyncOptionsLoader y UIFormProps v1 se eliminaron en la Fase 7 (código muerto). La API v2
+// usa AsyncOptionsLoader del motor (@laus/json-schema-form) y UIFormProps de components/form/UIForm.tsx.

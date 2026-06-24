@@ -35,16 +35,18 @@ function deepEqual(a: any, b: any): boolean {
   return true;
 }
 
-// Slice de useField: value/touched/field por identidad (Object.is) — son primitivos o refs estables del
-// store; error por VALOR (deepEqual) porque el objeto de errores se recrea en cada validación.
+// Slice de useField: value/touched/field por identidad (Object.is); error por VALOR (deepEqual, se recrea
+// en cada validate); e isVisible por VALOR — el motor MUTA el field in-place al re-derivar visibilidad
+// condicional (if/then), así que la ref del field no cambia pero su .isVisible sí. (fix casos de uso)
 function fieldSliceEqual(
-  a: [any, any, boolean, Field],
-  b: [any, any, boolean, Field],
+  a: [any, any, boolean, Field, boolean],
+  b: [any, any, boolean, Field, boolean],
 ): boolean {
   return (
     Object.is(a[0], b[0]) && // value
     Object.is(a[2], b[2]) && // touched
-    Object.is(a[3], b[3]) && // field (ref inmutable)
+    Object.is(a[3], b[3]) && // field (ref; mutado in-place por el motor)
+    Object.is(a[4], b[4]) && // isVisible (primitivo: detecta la mutación de visibilidad)
     deepEqual(a[1], b[1]) // error (objeto recreado en cada validate)
   );
 }
@@ -57,12 +59,14 @@ function fieldSliceEqual(
 export function useField(name: string): UseFieldResult {
   // Una sola suscripción por tupla: minimiza lecturas del store y compara con `fieldSliceEqual`.
   const [value, error, touched, field] = useFormStore(
-    (s: FormState): [any, any, boolean, Field] => [
+    (s: FormState): [any, any, boolean, Field, boolean] => [
       getPath(s.values, name),
       // errors top-level por name; anidados (fieldset/array) caen por getPath.
       (s.errors as Record<string, any>)[name] ?? getPath(s.errors as any, name),
       !!s.touched[name],
       s.fieldsByName[name],
+      // isVisible vivo: el motor lo re-deriva mutando el field en cada setValue (visibilidad condicional).
+      (s.fieldsByName[name]?.isVisible as boolean) ?? true,
     ],
     fieldSliceEqual,
   );

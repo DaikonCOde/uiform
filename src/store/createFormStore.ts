@@ -30,8 +30,8 @@ export function createFormStore(
   uiSchema: UiSchema | undefined,
   opts: FormStoreOptions,
 ): StoreApi<FormState> {
-  // 0) Compilar uiSchema → x-jsf-* (única vía de presentación). (ARCHITECTURE_V2.md §1 ter)
-  const internalSchema = compileUiSchema(schema, uiSchema);
+  // 0) Compilar uiSchema → x-jsf-* (única vía de presentación) + inyectar mensajes de error globales. (§1 ter)
+  const internalSchema = compileUiSchema(schema, uiSchema, opts.errorMessages);
 
   // 1) Parsear una sola vez con el motor (ya con x-jsf-*); no usamos strictInputType para no exigir inputType en todo campo.
   const { fields, handleValidation, layout } = createHeadlessForm(
@@ -63,21 +63,40 @@ export function createFormStore(
     touched: {},
     submitted: false,
     isSubmitting: false,
+    submitError: null,
     async: {},
 
     setValue: (name, value) => {
       // setPath clona la raíz y solo la rama tocada (inmutable, preserva refs de hermanos). (paths.ts)
-      set((s) => ({ values: setPath(s.values, name, value) }));
-      if (opts.config?.validateTrigger === "onChange") get().validate();
-      // CONTRATO: `errors` reflejan la ÚLTIMA validación, no el estado del value recién tipeado.
-      // Solo con validateTrigger:'onChange' corrió validate() arriba → acá van frescos. Con otros
-      // triggers (onBlur/onSubmit) son los últimos errores conocidos (p. ej. {} si aún no se validó).
-      opts.onChange?.(
-        formValuesToJsonValues(get().values, get().fields),
-        get().errors,
-      );
+      const newValues = setPath(get().values, name, value);
+      // Re-derivamos los fields en CADA cambio: el motor muta isVisible/computedAttributes in-place según
+      // los valores. Sin esto, la visibilidad condicional (if/then) queda congelada. (fix casos de uso)
+      const json = formValuesToJsonValues(newValues, get().fields);
+      const { formErrors } = handleValidation(json);
+      const fresh = formErrors ?? {};
+      // Lo que se MUESTRA (store.errors) se gobierna por validateTrigger; pero onChange recibe SIEMPRE
+      // los errores frescos (para "deshabilitar submit si inválido"). Un solo set → un solo notify.
+      const display =
+        opts.config?.validateTrigger === "onChange" ? fresh : get().errors;
+      set({ values: newValues, errors: display });
+      opts.onChange?.(json, fresh);
     },
-    setValues: (values) => set({ values }),
+    // MERGE parcial (no replace) + re-derivación. (fix casos de uso: setValues pisaba todo)
+    setValues: (values) => {
+      const merged = { ...get().values, ...values };
+      handleValidation(formValuesToJsonValues(merged, get().fields));
+      set({ values: merged });
+    },
+    // Hidratación para edición async: aplica `values` SIN pisar lo que el usuario ya tocó. (fix casos de uso)
+    hydrate: (values) => {
+      const s = get();
+      const next = { ...s.values };
+      for (const key of Object.keys(values)) {
+        if (!s.touched[key]) next[key] = values[key];
+      }
+      handleValidation(formValuesToJsonValues(next, s.fields));
+      set({ values: next });
+    },
     setTouched: (name) =>
       set((s) => ({ touched: { ...s.touched, [name]: true } })),
 
@@ -90,25 +109,28 @@ export function createFormStore(
     },
 
     submit: async () => {
-      set({ submitted: true, isSubmitting: true });
+      set({ submitted: true, isSubmitting: true, submitError: null });
       try {
         const errors = get().validate();
         // Cortamos antes de onSubmit si hay errores: no se envía un payload inválido. (ARCHITECTURE_V2.md §9)
         if (errors && Object.keys(errors).length) return;
         const json = formValuesToJsonValues(get().values, get().fields);
         await opts.onSubmit?.(json, errors);
+      } catch (e) {
+        // NO re-lanzamos (submit suele ser fire-and-forget desde un onClick → evita unhandled rejection).
+        // Guardamos el error para feedback vía useFormApi().submitError. (fix casos de uso)
+        set({ submitError: e instanceof Error ? e.message : String(e) });
       } finally {
         set({ isSubmitting: false });
       }
     },
 
-    reset: (values) =>
-      set({
-        values: getDefaultValuesFromFields(get().fields, values ?? {}),
-        errors: {},
-        touched: {},
-        submitted: false,
-      }),
+    reset: (values) => {
+      const next = getDefaultValuesFromFields(get().fields, values ?? {});
+      // Re-derivamos visibilidad/computed para el estado reseteado. (fix casos de uso)
+      handleValidation(formValuesToJsonValues(next, get().fields));
+      set({ values: next, errors: {}, touched: {}, submitted: false, submitError: null });
+    },
 
     loadAsyncOptions: async (loaderId, search = "") => {
       const loader = opts.asyncLoaders?.[loaderId];
