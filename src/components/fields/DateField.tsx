@@ -28,7 +28,7 @@ export function DateField({
   placeholder,
   minDate,
   maxDate,
-  format = 'YYYY-MM-DD',
+  format,
   showTime = false,
   picker = 'date',
   allowClear = true,
@@ -36,6 +36,14 @@ export function DateField({
 }: DateFieldProps) {
   const [internalTouched, setInternalTouched] = useState(false)
   const isTouched = touched ?? internalTouched
+
+  // El motor splatea el keyword JSON Schema `format` ("date" | "date-time" | "time") sobre el field, que
+  // colisiona con el `format` de DISPLAY del DatePicker (dayjs lo interpretaría como tokens → basura, p.ej.
+  // 'date' → '5amte'). Solo aceptamos como formato de display un string que NO sea un keyword del schema;
+  // el consumidor configura el display real vía ui:options.format (ej. 'DD/MM/YYYY'). (tarea v2)
+  const JSON_SCHEMA_FORMAT_KEYWORDS = new Set(['date', 'date-time', 'time'])
+  const displayFormatProp =
+    typeof format === 'string' && !JSON_SCHEMA_FORMAT_KEYWORDS.has(format) ? format : undefined
 
   const handleChange = useCallback((date: dayjs.Dayjs | null) => {
     if (!internalTouched) setInternalTouched(true)
@@ -83,9 +91,9 @@ export function DateField({
         }
         // Intentar parsear con formatos comunes
         else {
-          // Prioridad 1: Formato pasado como prop
-          if (format && format !== 'YYYY-MM-DD') {
-            parsed = dayjs(value, format, true)
+          // Prioridad 1: formato de display configurado por el consumidor (ui:options.format)
+          if (displayFormatProp && displayFormatProp !== 'YYYY-MM-DD') {
+            parsed = dayjs(value, displayFormatProp, true)
             if (parsed.isValid()) {
               return parsed
             }
@@ -116,7 +124,7 @@ export function DateField({
     } catch {
       return null
     }
-  }, [value, format])
+  }, [value, displayFormatProp])
 
   // Procesar las fechas mín y máx
   const disabledDate = useCallback((current: any) => {
@@ -144,14 +152,14 @@ export function DateField({
 
   // Determinar el formato de visualización
   const displayFormat = useMemo(() => {
-    // Prioridad 1: Formato pasado como prop
-    if (format && format !== 'YYYY-MM-DD') {
-      return showTime ? `${format} HH:mm:ss` : format
+    // Prioridad 1: formato de display configurado por el consumidor (ui:options.format)
+    if (displayFormatProp && displayFormatProp !== 'YYYY-MM-DD') {
+      return showTime ? `${displayFormatProp} HH:mm:ss` : displayFormatProp
     }
-    
-    // Formato por defecto
+
+    // Formato por defecto (estable, ISO-like para el display)
     return showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD'
-  }, [format, showTime])
+  }, [displayFormatProp, showTime])
 
   if (!isVisible) return null
 
@@ -162,7 +170,7 @@ export function DateField({
     value: dayjsValue,
     onChange: handleChange,
     onBlur: handleBlur,
-    placeholder: placeholder || `Select ${picker}...`,
+    placeholder: placeholder || 'Seleccioná una fecha',
     disabled,
     format: displayFormat, // Formato flexible de visualización
     showTime,
