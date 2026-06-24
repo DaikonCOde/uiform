@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, ConfigProvider } from 'antd'
+import { Button, ConfigProvider, Alert } from 'antd'
 import esES from 'antd/locale/es_ES'
 import 'dayjs/locale/es'
 import './App.css'
@@ -13,30 +13,32 @@ import {
   useFormApi,
   useSections,
 } from '@laus/uiform'
-import type { JsfObjectSchema, UiSchema, AsyncOptionsLoader } from '@laus/uiform'
+import type { JsfObjectSchema, UiSchema, FormLayout, AsyncOptionsLoader } from '@laus/uiform'
 
 /**
- * Playground de verificación de UIForm v2 (Fases 1-4).
+ * Playground de verificación de UIForm v2.
  *
- * Ejercita el camino completo: schema + uiSchema → compileUiSchema → store → hooks →
- * controlador <Field> → presentacionales AntD. Sirve para VER (no solo testear) que
- * el compilador, la suscripción granular, el async y la validación funcionan de verdad.
+ * Demo "complejo": grid responsivo, select dependiente (país→provincia), visibilidad condicional
+ * (CUIT solo si facturás), validaciones con mensajes en español, fieldset y group-array.
  */
 
-// ── 1) schema PURO (contrato de datos): tipos + validación, sin presentación ──
+// ── 1) schema PURO: dato + validación (incl. condición if/then/else para CUIT) ──
 const schema: JsfObjectSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['nombre', 'email'],
+  required: ['nombre', 'email', 'edad'],
   properties: {
     nombre: { type: 'string', title: 'Nombre' },
     email: { type: 'string', title: 'Email', format: 'email' },
-    edad: { type: 'number', title: 'Edad', minimum: 0 },
+    edad: { type: 'number', title: 'Edad', minimum: 18, maximum: 120 },
     pais: { type: 'string', title: 'País' },
+    provincia: { type: 'string', title: 'Provincia' },
     ciudad: { type: 'string', title: 'Ciudad' },
-    bio: { type: 'string', title: 'Bio' },
     nacimiento: { type: 'string', title: 'Fecha de nacimiento' },
-    acepta: { type: 'boolean', title: 'Acepto los términos' },
+    bio: { type: 'string', title: 'Bio', maxLength: 200 },
+    facturaElectronica: { type: 'boolean', title: '¿Emitís factura electrónica?' },
+    cuit: { type: 'string', title: 'CUIT', pattern: '^\\d{2}-\\d{8}-\\d{1}$' },
+    acepta: { type: 'boolean', title: 'Acepto los términos y condiciones' },
     // Contenedor: fieldset → objeto anidado.
     direccion: {
       type: 'object',
@@ -44,6 +46,8 @@ const schema: JsfObjectSchema = {
       properties: {
         calle: { type: 'string', title: 'Calle' },
         numero: { type: 'number', title: 'Número' },
+        ciudad: { type: 'string', title: 'Ciudad' },
+        cp: { type: 'string', title: 'Código postal' },
       },
     },
     // Contenedor: group-array → array de objetos.
@@ -54,54 +58,89 @@ const schema: JsfObjectSchema = {
         type: 'object',
         properties: {
           nombre: { type: 'string', title: 'Nombre' },
+          tipo: {
+            type: 'string',
+            title: 'Tipo',
+            oneOf: [
+              { const: 'personal', title: 'Personal' },
+              { const: 'laboral', title: 'Laboral' },
+            ],
+          },
           telefono: { type: 'string', title: 'Teléfono' },
         },
       },
     },
   },
+  // Visibilidad condicional: el CUIT solo aparece (y es requerido) si facturaElectronica = true.
+  allOf: [
+    {
+      if: { properties: { facturaElectronica: { const: true } }, required: ['facturaElectronica'] },
+      then: { required: ['cuit'] },
+      else: { properties: { cuit: false } },
+    },
+  ],
 }
 
-// ── 2) uiSchema (presentación RJSF): widget, placeholder, autofocus, async y SECCIONES ──
+// ── 2) uiSchema: presentación + GRID (colSpan por campo, layout por sección) ──
 const uiSchema: UiSchema = {
   'ui:sections': [
-    { id: 'datos', title: 'Datos personales xd', fields: ['nombre', 'email', 'edad'] },
-    { id: 'extra', title: 'Información adicional', fields: ['pais', 'ciudad', 'nacimiento', 'bio', 'acepta'] },
-    { id: 'avanzado', title: 'Contenedores (fieldset + group-array)', fields: ['direccion', 'contactos'] },
+    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad'] },
+    { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento'] },
+    { id: 'extra', title: 'Información adicional', fields: ['bio', 'facturaElectronica', 'cuit', 'acepta'] },
+    // Esta sección overridea el grid global a 1 columna (contenedores a lo ancho).
+    { id: 'contenedores', title: 'Dirección y contactos', fields: ['direccion', 'contactos'], layout: { columns: 1 } },
   ],
   nombre: { 'ui:widget': 'text', 'ui:placeholder': 'Tu nombre', 'ui:autofocus': true },
   email: { 'ui:widget': 'email', 'ui:placeholder': 'tu@mail.com', 'ui:errorMessages': { format: 'Ingresá un email válido' } },
-  edad: { 'ui:widget': 'number', 'ui:placeholder': '0' },
+  edad: {
+    'ui:widget': 'number',
+    'ui:placeholder': '18',
+    'ui:errorMessages': { minimum: 'Tenés que ser mayor de 18', maximum: 'Edad inválida' },
+  },
   pais: { 'ui:widget': 'select', 'ui:options': { asyncOptions: { id: 'paises' } } },
+  // Select DEPENDIENTE: recarga sus opciones cuando cambia `pais`.
+  provincia: { 'ui:widget': 'select', 'ui:options': { asyncOptions: { id: 'provincias', dependencies: ['pais'] } } },
   ciudad: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá tu ciudad...', 'ui:options': { asyncOptions: { id: 'ciudades', searchable: true } } },
-  bio: { 'ui:widget': 'textarea', 'ui:placeholder': 'Contanos algo...' },
-  nacimiento: { 'ui:widget': 'date' },
-  acepta: { 'ui:widget': 'checkbox' },
+  nacimiento: { 'ui:widget': 'date', 'ui:options': { format: 'DD/MM/YYYY' } },
+  bio: { 'ui:widget': 'textarea', 'ui:placeholder': 'Contanos algo...', 'ui:colSpan': 2 },
+  facturaElectronica: { 'ui:widget': 'checkbox' },
+  cuit: { 'ui:widget': 'text', 'ui:placeholder': '20-12345678-3', 'ui:errorMessages': { pattern: 'CUIT inválido (formato XX-XXXXXXXX-X)' } },
+  acepta: { 'ui:widget': 'checkbox', 'ui:colSpan': 2 },
   direccion: {
     'ui:widget': 'fieldset',
     calle: { 'ui:widget': 'text', 'ui:placeholder': 'Av. Siempreviva' },
     numero: { 'ui:widget': 'number', 'ui:placeholder': '742' },
+    ciudad: { 'ui:widget': 'text' },
+    cp: { 'ui:widget': 'text', 'ui:placeholder': '1414' },
   },
   contactos: {
     'ui:widget': 'group-array',
     nombre: { 'ui:widget': 'text' },
+    tipo: { 'ui:widget': 'select' },
     telefono: { 'ui:widget': 'text' },
   },
 }
 
-// ── 2b) errorMessages: mensajes de validación globales (i18n) en español. Un campo puede
-//        sobreescribirlos con `ui:errorMessages` (ver email). ──
+// ── Grid GLOBAL del formulario: 2 columnas (1 en mobile), gap 16px por default ──
+const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 2 } }
+
+// ── Mensajes de validación globales (i18n) en español. Un campo puede overridear con ui:errorMessages ──
 const errorMessages: Record<string, string> = {
   required: 'Este campo es obligatorio',
   format: 'El formato no es válido',
   type: 'El valor no es del tipo esperado',
   minimum: 'El valor es demasiado bajo',
+  maximum: 'El valor es demasiado alto',
+  pattern: 'El formato no es válido',
 }
 
-// ── 3) asyncLoaders: opciones del Select cargadas async desde el store ──
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+// ── 3) asyncLoaders ──
 const asyncLoaders: Record<string, AsyncOptionsLoader> = {
   paises: async () => {
-    // Simula latencia de red para ver el estado loading del Select.
-    await new Promise((r) => setTimeout(r, 600))
+    await delay(500)
     return {
       options: [
         { label: 'Argentina', value: 'ar' },
@@ -111,19 +150,28 @@ const asyncLoaders: Record<string, AsyncOptionsLoader> = {
       ],
     }
   },
-  // Autocomplete searchable: filtra server-side por el término tipeado (insensible a acentos).
+  // DEPENDIENTE de `pais`: devuelve las provincias del país elegido.
+  provincias: async ({ formValues }) => {
+    await delay(400)
+    const byPais: Record<string, string[]> = {
+      ar: ['Buenos Aires', 'Córdoba', 'Santa Fe', 'Mendoza'],
+      uy: ['Montevideo', 'Canelones', 'Maldonado'],
+      cl: ['Región Metropolitana', 'Valparaíso', 'Biobío'],
+      br: ['São Paulo', 'Rio de Janeiro', 'Minas Gerais'],
+    }
+    const provs = byPais[formValues?.pais as string] ?? []
+    return { options: provs.map((p) => ({ label: p, value: p })) }
+  },
   ciudades: async ({ search }) => {
-    await new Promise((r) => setTimeout(r, 300))
+    await delay(300)
     const all = ['Buenos Aires', 'Córdoba', 'Rosario', 'Mendoza', 'La Plata', 'Mar del Plata', 'Salta']
-    const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     const q = norm(search ?? '')
     return { options: all.filter((c) => norm(c).includes(q)).map((c) => ({ label: c, value: c })) }
   },
 }
 
-/** Renderiza el formulario por secciones, leyendo la metadata resuelta del store. */
+/** Renderiza el formulario por secciones (el grid lo aplica cada FormSection según el layout). */
 function FormBody() {
-  // Render por secciones usando el componente público <FormSection> (su default arma título + campos).
   const sections = useSections()
   return (
     <>
@@ -134,21 +182,21 @@ function FormBody() {
   )
 }
 
-/** Botón de submit cableado al store vía useFormApi (acciones estables + flags). */
+/** Barra de submit + feedback de error de submit (submitError). */
 function SubmitBar() {
-  const { reset } = useFormApi()
+  const { reset, submitError } = useFormApi()
   return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-      <SubmitButton>Enviar</SubmitButton>
-      <Button onClick={() => reset()}>Reset</Button>
-      <span style={{ alignSelf: 'center', color: 'rgba(0,0,0,0.45)', fontSize: 12 }}>
-        onSubmit imprime el payload JSON en el panel derecho
-      </span>
+    <div style={{ marginTop: 8 }}>
+      {submitError && <Alert type="error" message={submitError} style={{ marginBottom: 8 }} />}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <SubmitButton>Enviar</SubmitButton>
+        <Button onClick={() => reset()}>Reset</Button>
+      </div>
     </div>
   )
 }
 
-/** Inspector en vivo: values + errors + validez. Prueba la reactividad granular. */
+/** Inspector en vivo: values + errors. */
 function StoreInspector() {
   const values = useFormStore((s) => s.values)
   const errors = useFormStore((s) => s.errors)
@@ -168,7 +216,7 @@ const panel: React.CSSProperties = {
   color: '#7CFC9B',
   padding: 12,
   borderRadius: 6,
-  maxHeight: 220,
+  maxHeight: 240,
   overflow: 'auto',
   margin: 0,
 }
@@ -178,22 +226,23 @@ function App() {
 
   return (
     <ConfigProvider locale={esES}>
-      <div style={{ padding: 32, maxWidth: 1040, margin: '0 auto' }}>
-        <h1 style={{ marginBottom: 4 }}>UIForm v2 — Playground (Fases 1-4)</h1>
+      <div style={{ padding: 32, maxWidth: 1100, margin: '0 auto' }}>
+        <h1 style={{ marginBottom: 4 }}>UIForm v2 — Playground</h1>
         <p style={{ color: 'rgba(0,0,0,0.45)', marginTop: 0 }}>
-          schema + uiSchema → compilador → store → hooks → <code>&lt;Field&gt;</code>. Tipeá y mirá el
-          panel derecho reaccionar; "Enviar" valida contra el JSON Schema.
+          Grid responsivo · select dependiente (país→provincia) · CUIT condicional (tildá "factura
+          electrónica") · validaciones en español · fieldset y group-array.
         </p>
 
         <FormProvider
           schema={schema}
           uiSchema={uiSchema}
+          layout={layout}
           asyncLoaders={asyncLoaders}
           errorMessages={errorMessages}
           config={{ validateTrigger: 'onSubmit' }}
           onSubmit={(json) => setSubmitted(json)}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'start' }}>
             <div>
               <FormBody />
               <SubmitBar />
