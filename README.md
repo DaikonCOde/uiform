@@ -137,12 +137,12 @@ function SubmitBar() {
 
 ## Documentation
 
-See **[docs/USAGE.md](./docs/USAGE.md)** for the full guide:
+Full guide: **[docs/usage/index.md](./docs/usage/index.md)** — organized into small, focused pages:
 
-- `schema` + `uiSchema` model and the `uiSchema` reference
-- `<FormProvider>` / `<Field>` and the hooks (`useField`, `useWatch`, `useFormApi`, `useAsyncOptions`)
-- Widgets, sections (`ui:sections`), async options, validation
-- Containers (`fieldset`, `group-array`) and granular re-render performance
+- **Concepts** — `schema` + `uiSchema` model, `uiSchema` reference, sections, async options, validation, performance
+- **Components** — `<FormProvider>`, `<Field>`
+- **Hooks** — `useField`, `useWatch`, `useFormApi`, `useAsyncOptions`, `useFormStore`
+- **Widgets** — one page per field type (text, number, select, autocomplete, checkbox, date, file, fieldset, group-array, …)
 
 Internal design docs: [ARCHITECTURE_V2.md](./docs/ARCHITECTURE_V2.md) · [ROADMAP_V2.md](./docs/ROADMAP_V2.md) · [REVIEW_V2.md](./docs/REVIEW_V2.md)
 
