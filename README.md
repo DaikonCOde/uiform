@@ -2,10 +2,11 @@
 
 A React form library built on JSON Schema with Ant Design components and responsive layouts.
 
-> **Status — v2 in active development.** The `schema` + `uiSchema` API below is implemented and
-> verified end-to-end, but the public package exports (`src/lib/index.ts`) are finalized in a later
-> phase. Until then, the live reference is the playground (`src/App.tsx`), runnable with `npm run dev`.
-> See [docs/ROADMAP_V2.md](./docs/ROADMAP_V2.md) for status.
+> **Status — v2 feature-complete (pre-release).** The `schema` + `uiSchema` API is implemented and
+> verified end-to-end in the browser, and the public exports are wired in `src/lib/index.ts`
+> (`FormProvider`, `Field`, `FormSection`, `SubmitButton`, `UIForm`, hooks, types). Pending post-v1:
+> root-level responsive grid (no `ui:layout` API yet). Run the playground with `npm run dev`.
+> See [docs/ROADMAP_V2.md](./docs/ROADMAP_V2.md) and [docs/REVIEW_V2.md](./docs/REVIEW_V2.md).
 
 ## Features
 

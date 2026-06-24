@@ -51,6 +51,9 @@ export const Demo = () => (
 |--------|---------------|
 | [`<FormProvider>`](./components/form-provider.md) | Crea el store por instancia y expone el form. |
 | [`<Field>`](./components/field.md) | Renderiza un campo por su `name`. |
+| [`<FormSection>`](./components/form-section.md) | Renderiza los campos de una sección (default o layout custom). |
+| [`<SubmitButton>`](./components/submit-button.md) | Botón de envío cableado al form. |
+| [`<UIForm>`](./components/uiform.md) | Atajo todo-en-uno (secciones + barra de submit). |
 
 ### Hooks
 
@@ -60,6 +63,8 @@ export const Demo = () => (
 | [`useWatch`](./hooks/use-watch.md) | Observa valores puntuales sin re-renders de más. |
 | [`useFormApi`](./hooks/use-form-api.md) | Acciones del form (`submit`, `reset`, `validate`) y flags. |
 | [`useAsyncOptions`](./hooks/use-async-options.md) | Opciones de un loader async para casos custom. |
+| [`useSection`](./hooks/use-section.md) | Metadata de una sección por id. |
+| [`useSections`](./hooks/use-sections.md) | Todas las secciones resueltas. |
 | [`useFormStore`](./hooks/use-form-store.md) | Acceso de bajo nivel al store con selector. |
 
 ### Widgets

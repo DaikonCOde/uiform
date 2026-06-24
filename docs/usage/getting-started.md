@@ -74,12 +74,26 @@ y solo se llama si la validación pasa.
 
 ## Estado de la API pública
 
-> Las Fases 1-4 (compilador, store, hooks, campos, contenedores, async, validación) están implementadas y
-> **verificadas end-to-end en el browser** (ver [`REVIEW_V2.md`](../REVIEW_V2.md)). El cableado final de
-> los **exports públicos** en `src/lib/index.ts` se finaliza en la Fase 7. Mientras tanto, el playground
-> (`src/App.tsx`) consume la API desde el source y es el ejemplo vivo más completo.
+> Fases 1-7 completas y **verificadas end-to-end en el browser** (ver [`REVIEW_V2.md`](../REVIEW_V2.md)).
+> La API pública v2 está cableada en el entry (`src/lib/index.ts`) y se consume desde `@laus/uiform`:
+> componentes (`FormProvider`, `Field`, `FormSection`, `SubmitButton`, `UIForm`), hooks y tipos.
+> El playground (`src/App.tsx`) la usa tal cual y es el ejemplo vivo más completo.
+>
+> **Pendiente post-v1:** el grid responsive a nivel raíz (todavía sin API `ui:layout`).
+
+## Atajo: `<UIForm>`
+
+Si no necesitás un layout custom, `<UIForm>` arma todo (secciones + barra de submit) en un componente:
+
+```tsx
+import { UIForm } from '@laus/uiform'
+
+<UIForm schema={schema} uiSchema={uiSchema} onSubmit={(v) => console.log(v)} />
+```
+
+Ver [`<UIForm>`](./components/uiform.md) y [`<SubmitButton>`](./components/submit-button.md).
 
 ## Próximos pasos
 
 - [El modelo `schema` + `uiSchema`](./concepts/schema-and-uischema.md)
-- [`<FormProvider>`](./components/form-provider.md)
+- [`<FormProvider>`](./components/form-provider.md) · [`<Field>`](./components/field.md) · [`<FormSection>`](./components/form-section.md)
