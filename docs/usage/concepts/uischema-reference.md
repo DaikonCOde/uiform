@@ -19,8 +19,10 @@ La key del entry es el `name` de la property. Su valor es un objeto con estas cl
 | `ui:disabled` | `boolean` | Deshabilita el campo. |
 | `ui:title` | `string` | Sobreescribe el label (semántica RJSF: mapea al `title` de la property). |
 | `ui:description` | `string` | Texto de ayuda del campo. |
-| `ui:options` | `object` | Props extra arbitrarias que se splatean al campo (`accept`, `maxFileSize`, `asyncOptions`, `multiple`, …). |
+| `ui:options` | `object` | Props extra arbitrarias que se splatean al campo (`accept`, `maxFileSize`, `asyncOptions`, `multiple`, `format`, …). Para fechas, `ui:options.format` define el formato de display del widget (ver [date](../widgets/date.md)). |
 | `ui:order` | `string[]` | Orden de los hijos en un contenedor (`fieldset` / `group-array`). |
+| `ui:colSpan` | `number \| {sm,md,lg,xl}` | Columnas del grid que ocupa el campo (default `1`). Acepta un valor fijo o responsivo por breakpoint. Ver [Grid responsivo](./layout-grid.md). |
+| `ui:errorMessages` | `Record<string, string>` | Mensajes custom por tipo de validación (`required`, `format`, …) para **este** campo; sobreescribe los globales. Ver [Mensajes de error](./error-messages.md). |
 
 ### Ejemplo por campo
 

@@ -92,8 +92,16 @@ const schema = {
 }
 ```
 
+## Customizar y traducir mensajes (i18n)
+
+`x-jsf-errorMessage` cubre el caso por-campo desde el `schema`. Para mensajes **globales** (un default por
+tipo de validación para todo el form) y para **traducir** (i18n) usá `errorMessages` en el
+[`<FormProvider>`](../components/form-provider.md) o `ui:errorMessages` por campo en el `uiSchema`. La
+precedencia y los ejemplos completos están en [Mensajes de error](./error-messages.md).
+
 ## Links
 
+- [Mensajes de error](./error-messages.md) — customizar y traducir mensajes (global + por campo).
 - [`useFormApi`](../hooks/use-form-api.md)
 - [`<FormProvider>`](../components/form-provider.md)
 - [`useFormStore`](../hooks/use-form-store.md)

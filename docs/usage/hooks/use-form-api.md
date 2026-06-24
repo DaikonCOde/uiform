@@ -9,8 +9,10 @@ function useFormApi(): {
   submit: () => Promise<void>
   reset: (values?: Record<string, unknown>) => void
   validate: () => FormErrors
+  hydrate: (values: Record<string, unknown>) => void
   isSubmitting: boolean
   isValid: boolean
+  submitError: string | null
 }
 ```
 
@@ -21,8 +23,10 @@ function useFormApi(): {
 | `submit` | `() => Promise<void>` | Valida primero; **si hay errores, NO llama a `onSubmit`** (no se envía payload inválido). Referencia estable. |
 | `reset` | `(values?) => void` | Resetea el form. Sin argumento vuelve a los `initialValues`; con `values` resetea a ese objeto. Referencia estable. |
 | `validate` | `() => FormErrors` | Dispara la validación y devuelve el objeto de errores actual (vacío si todo OK). Referencia estable. |
+| `hydrate` | `(values) => void` | Carga datos (edición async) **sin pisar** lo que el usuario ya tocó. Para precargar un form de edición tras un fetch. Referencia estable. Ver [Cargar datos async](../concepts/loading-data.md). |
 | `isSubmitting` | `boolean` | `true` mientras corre `submit()`. Reactivo: re-renderiza al cambiar. |
 | `isValid` | `boolean` | `true` si **no hay errores conocidos** (`store.errors` sin claves). Reactivo. |
+| `submitError` | `string \| null` | Error que tiró `onSubmit` (para feedback); `null` si no hubo. Reactivo. Útil para mostrar fallos del envío async. |
 
 ## Ejemplo: barra de envío
 

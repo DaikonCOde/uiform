@@ -41,8 +41,12 @@ export const Demo = () => (
 | [schema + uiSchema](./concepts/schema-and-uischema.md) | El modelo mental de los dos documentos. |
 | [Referencia del uiSchema](./concepts/uischema-reference.md) | Todas las claves `ui:*` por campo y a nivel raíz. |
 | [Secciones](./concepts/sections.md) | Agrupar campos con `ui:sections`. |
+| [Grid responsivo](./concepts/layout-grid.md) | Layout en columnas con `layout` y `ui:colSpan` por breakpoint. |
 | [Opciones async](./concepts/async-options.md) | Cargar opciones de Select/Autocomplete dinámicamente. |
+| [Cargar datos async](./concepts/loading-data.md) | Precargar un form de edición con `hydrate()` sin pisar lo tipeado. |
 | [Validación](./concepts/validation.md) | Cómo y cuándo se valida; errores y mensajes custom. |
+| [Mensajes de error](./concepts/error-messages.md) | Customizar y traducir mensajes (global + por campo, i18n). |
+| [Widgets custom](./concepts/custom-widgets.md) | Reemplazar o agregar widgets con la prop `components`. |
 | [Performance](./concepts/performance.md) | Suscripción granular y cómo evitar re-renders. |
 
 ### Componentes
