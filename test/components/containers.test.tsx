@@ -137,7 +137,7 @@ describe("contenedores manejados por <Field> (fieldset + group-array)", () => {
       renderForm();
       expect(screen.getByText("Contacts")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /add item/i }),
+        screen.getByRole("button", { name: /agregar/i }),
       ).toBeInTheDocument();
     });
 
@@ -154,7 +154,7 @@ describe("contenedores manejados por <Field> (fieldset + group-array)", () => {
       const user = userEvent.setup();
       const { getStore } = renderForm();
 
-      await user.click(screen.getByRole("button", { name: /add item/i }));
+      await user.click(screen.getByRole("button", { name: /agregar/i }));
 
       const contacts = getStore().getState().values.contacts;
       expect(Array.isArray(contacts)).toBe(true);
@@ -199,10 +199,10 @@ describe("contenedores manejados por <Field> (fieldset + group-array)", () => {
 
       expect(getStore().getState().values.contacts).toHaveLength(2);
 
-      // confirmDelete=true por default → el botón abre un Popconfirm; confirmamos con "Si".
-      const deleteButtons = screen.getAllByRole("button", { name: /delete/i });
+      // confirmDelete=true por default → el botón abre un Popconfirm; confirmamos con "Sí".
+      const deleteButtons = screen.getAllByRole("button", { name: /eliminar/i });
       await user.click(deleteButtons[0]);
-      await user.click(screen.getByRole("button", { name: /^si$/i }));
+      await user.click(screen.getByRole("button", { name: /^sí$/i }));
 
       const contacts = getStore().getState().values.contacts;
       expect(contacts).toHaveLength(1);
@@ -213,7 +213,7 @@ describe("contenedores manejados por <Field> (fieldset + group-array)", () => {
       const user = userEvent.setup();
       const { getStore } = renderForm();
 
-      await user.click(screen.getByRole("button", { name: /add item/i }));
+      await user.click(screen.getByRole("button", { name: /agregar/i }));
 
       const fullname = document.getElementById(
         "contacts.0.fullname",
@@ -263,7 +263,7 @@ describe("contenedores manejados por <Field> (fieldset + group-array)", () => {
         </FormProvider>,
       );
 
-      await user.click(screen.getByRole("button", { name: /add item/i }));
+      await user.click(screen.getByRole("button", { name: /agregar/i }));
       const idInput = document.getElementById("rows.0.id") as HTMLInputElement;
       idInput.focus();
       await user.type(idInput, "abc");

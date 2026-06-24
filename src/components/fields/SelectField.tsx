@@ -108,7 +108,7 @@ export function SelectField({
     value,
     onChange: handleChange,
     onBlur: handleBlur,
-    placeholder: placeholder || `Select ${inputType === 'country' ? 'country' : 'option'}...`,
+    placeholder: placeholder || `Seleccioná ${inputType === 'country' ? 'un país' : 'una opción'}...`,
     disabled: disabled || loading,
     mode: multiple ? ('multiple' as const) : undefined,
     allowClear,

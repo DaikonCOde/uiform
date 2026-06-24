@@ -28,8 +28,8 @@ export function GroupArrayField({
   // Props específicos del array
   minItems = 0,
   maxItems,
-  addButtonText = 'Add Item',
-  deleteButtonText = 'Delete',
+  addButtonText = 'Agregar',
+  deleteButtonText = 'Eliminar',
   confirmDelete = true,
 }: GroupArrayFieldPropsExtended & {
   minItems?: number
@@ -107,7 +107,7 @@ export function GroupArrayField({
       <div className={styles.arrayContainer}>
         {arrayValue.length === 0 ? (
           <div className={styles.arrayEmpty}>
-            No items yet. Click "Add Item" to get started.
+            Sin elementos. Hacé clic en "Agregar" para empezar.
           </div>
         ) : (
           <Space direction="vertical" style={{ width: '100%' }}>
@@ -126,7 +126,7 @@ export function GroupArrayField({
                 title={
                   <div className={styles.arrayItemHeader}>
                     <Space>
-                      <span>Item {index + 1}</span>
+                      <span>Elemento {index + 1}</span>
                     </Space>
                     
                     {canRemove && !disabled && (
@@ -134,7 +134,7 @@ export function GroupArrayField({
                         <Popconfirm
                           title="¿Está seguro que desea eliminar este ítem?"
                           onConfirm={() => handleRemoveItem(index)}
-                          okText="Si"
+                          okText="Sí"
                           cancelText="No"
                         >
                           <Button 
