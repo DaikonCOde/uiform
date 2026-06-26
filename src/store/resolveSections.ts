@@ -20,6 +20,26 @@ export function indexByName(fields: Field[]): Record<string, Field> {
   return index;
 }
 
+/**
+ * Resuelve la metadata (Field) de un path con punto: top-level ("email"), fieldset ("dir.calle") o
+ * item de array ("contactos.0.nombre"). Los segmentos numéricos son índices de array → se saltan
+ * (los hijos viven en el template `.fields` del contenedor). Devuelve undefined si no existe.
+ */
+export function getFieldByPath(
+  fieldsByName: Record<string, Field>,
+  name: string,
+): Field | undefined {
+  if (fieldsByName[name]) return fieldsByName[name]; // fast-path top-level
+  const parts = name.split(".");
+  let current: Field | undefined = fieldsByName[parts[0]];
+  for (let i = 1; i < parts.length && current; i++) {
+    const part = parts[i];
+    if (/^\d+$/.test(part)) continue; // índice de array → mismo template de items
+    current = (current.fields ?? []).find((f) => f.name === part);
+  }
+  return current;
+}
+
 /** Resuelve x-jsf-sections (interno) a secciones con sus Field, preservando el orden. */
 export function resolveSections(
   internalSchema: JsfObjectSchema,
