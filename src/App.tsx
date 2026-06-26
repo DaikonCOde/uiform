@@ -34,6 +34,7 @@ const schema: JsfObjectSchema = {
     pais: { type: 'string', title: 'País' },
     provincia: { type: 'string', title: 'Provincia' },
     ciudad: { type: 'string', title: 'Ciudad' },
+    usuario: { type: 'string', title: 'Usuario (búsqueda en API)' },
     nacimiento: { type: 'string', title: 'Fecha de nacimiento' },
     bio: { type: 'string', title: 'Bio', maxLength: 200 },
     facturaElectronica: { type: 'boolean', title: '¿Emitís factura electrónica?' },
@@ -84,7 +85,7 @@ const schema: JsfObjectSchema = {
 // ── 2) uiSchema: presentación + GRID (colSpan por campo, layout por sección) ──
 const uiSchema: UiSchema = {
   'ui:sections': [
-    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad'] },
+    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad', 'usuario'] },
     { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento'] },
     { id: 'extra', title: 'Información adicional', fields: ['bio', 'facturaElectronica', 'cuit', 'acepta'] },
     // Esta sección overridea el grid global a 1 columna (contenedores a lo ancho).
@@ -101,6 +102,7 @@ const uiSchema: UiSchema = {
   // Select DEPENDIENTE: recarga sus opciones cuando cambia `pais`.
   provincia: { 'ui:widget': 'select', 'ui:options': { asyncOptions: { id: 'provincias', dependencies: ['pais'] } } },
   ciudad: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá tu ciudad...', 'ui:options': { asyncOptions: { id: 'ciudades', searchable: true } } },
+  usuario: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá un usuario (JSONPlaceholder)...', 'ui:options': { asyncOptions: { id: 'usuarios', searchable: true } } },
   nacimiento: { 'ui:widget': 'date', 'ui:options': { format: 'DD/MM/YYYY' } },
   bio: { 'ui:widget': 'textarea', 'ui:placeholder': 'Contanos algo...', 'ui:colSpan': 2 },
   facturaElectronica: { 'ui:widget': 'checkbox' },
@@ -167,6 +169,19 @@ const asyncLoaders: Record<string, AsyncOptionsLoader> = {
     const all = ['Buenos Aires', 'Córdoba', 'Rosario', 'Mendoza', 'La Plata', 'Mar del Plata', 'Salta']
     const q = norm(search ?? '')
     return { options: all.filter((c) => norm(c).includes(q)).map((c) => ({ label: c, value: c })) }
+  },
+  // Búsqueda en API REAL (JSONPlaceholder): trae los usuarios y filtra por nombre/username con el término.
+  // (JSONPlaceholder no tiene endpoint de search; en una API real reemplazarías esto por /search?q=...)
+  usuarios: async ({ search }) => {
+    const res = await fetch('https://jsonplaceholder.typicode.com/users')
+    if (!res.ok) throw new Error('No se pudieron cargar los usuarios')
+    const users: Array<{ id: number; name: string; username: string }> = await res.json()
+    const q = norm(search ?? '')
+    return {
+      options: users
+        .filter((u) => norm(u.name).includes(q) || norm(u.username).includes(q))
+        .map((u) => ({ label: `${u.name} (@${u.username})`, value: u.name })),
+    }
   },
 }
 
