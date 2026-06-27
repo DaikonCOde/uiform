@@ -60,6 +60,26 @@ export function createFormStore(
   // a la nueva). Sin esto, dos cargas concurrentes del mismo id ganan por orden de RESOLUCIÓN. (fix de revisión)
   const loadSeq: Record<string, number> = {};
 
+  // Valida re-derivando la visibilidad ANTES de armar el JSON final. formValuesToJsonValues OMITE el valor
+  // de los campos ocultos (field.isVisible===false); si armáramos el JSON con la visibilidad VIEJA, un campo
+  // que justo se vuelve visible perdería su valor → "Required" falso (y uno que se oculta → "Not allowed").
+  // 1ª pasada: asienta isVisible según los nuevos valores. Si la visibilidad cambió, 2ª pasada con el JSON ya
+  // correcto. Si no cambió (tipeo normal), una sola pasada. (fix required/not-allowed al togglear visibilidad)
+  const deriveAndValidate = (
+    values: Record<string, any>,
+    flds: any[],
+  ): { json: any; errors: Record<string, any> } => {
+    const visBefore = flds.map((f) => f?.isVisible).join(",");
+    const json1 = formValuesToJsonValues(values, flds);
+    const res1 = handleValidation(json1);
+    const visAfter = flds.map((f) => f?.isVisible).join(",");
+    if (visBefore === visAfter) return { json: json1, errors: res1.formErrors ?? {} };
+    // La visibilidad cambió por este set → el JSON anterior usó la vieja; lo rearmamos y revalidamos.
+    const json2 = formValuesToJsonValues(values, flds);
+    const res2 = handleValidation(json2);
+    return { json: json2, errors: res2.formErrors ?? {} };
+  };
+
   return createStore<FormState>((set, get) => ({
     // ── Estructura (inmutable tras crear) ──
     fields,
@@ -82,10 +102,8 @@ export function createFormStore(
       // setPath clona la raíz y solo la rama tocada (inmutable, preserva refs de hermanos). (paths.ts)
       const newValues = setPath(get().values, name, value);
       // Re-derivamos los fields en CADA cambio: el motor muta isVisible/computedAttributes in-place según
-      // los valores. Sin esto, la visibilidad condicional (if/then) queda congelada. (fix casos de uso)
-      const json = formValuesToJsonValues(newValues, get().fields);
-      const { formErrors } = handleValidation(json);
-      const fresh = formErrors ?? {};
+      // los valores. deriveAndValidate asienta la visibilidad ANTES de armar el JSON (ver su comentario).
+      const { json, errors: fresh } = deriveAndValidate(newValues, get().fields);
       // Lo que se MUESTRA (store.errors) se gobierna por validateTrigger; pero onChange recibe SIEMPRE
       // los errores frescos (para "deshabilitar submit si inválido"). Un solo set → un solo notify.
       const display =
@@ -96,7 +114,7 @@ export function createFormStore(
     // MERGE parcial (no replace) + re-derivación. (fix casos de uso: setValues pisaba todo)
     setValues: (values) => {
       const merged = { ...get().values, ...values };
-      handleValidation(formValuesToJsonValues(merged, get().fields));
+      deriveAndValidate(merged, get().fields);
       set({ values: merged });
     },
     // Hidratación para edición async: aplica `values` SIN pisar lo que el usuario ya tocó. (fix casos de uso)
@@ -106,18 +124,18 @@ export function createFormStore(
       for (const key of Object.keys(values)) {
         if (!s.touched[key]) next[key] = values[key];
       }
-      handleValidation(formValuesToJsonValues(next, s.fields));
+      deriveAndValidate(next, s.fields);
       set({ values: next });
     },
     setTouched: (name) =>
       set((s) => ({ touched: { ...s.touched, [name]: true } })),
 
     validate: () => {
-      // Validación sale del JSON Schema puro: UI → JSON y delega en el motor. (ARCHITECTURE_V2.md §9)
-      const json = formValuesToJsonValues(get().values, get().fields);
-      const { formErrors } = handleValidation(json);
-      set({ errors: formErrors ?? {} });
-      return formErrors ?? {};
+      // Validación sale del JSON Schema puro: UI → JSON y delega en el motor, re-derivando visibilidad
+      // antes de armar el JSON (mismo motivo que setValue). (ARCHITECTURE_V2.md §9)
+      const { errors } = deriveAndValidate(get().values, get().fields);
+      set({ errors });
+      return errors;
     },
 
     submit: async () => {
@@ -140,7 +158,7 @@ export function createFormStore(
     reset: (values) => {
       const next = getDefaultValuesFromFields(get().fields, values ?? {});
       // Re-derivamos visibilidad/computed para el estado reseteado. (fix casos de uso)
-      handleValidation(formValuesToJsonValues(next, get().fields));
+      deriveAndValidate(next, get().fields);
       set({ values: next, errors: {}, touched: {}, submitted: false, submitError: null });
     },
 
