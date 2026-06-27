@@ -37,7 +37,7 @@ export function TextField({
     onBlur?.(name)
   }, [name, onBlur, internalTouched])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   // Campo oculto
   if (inputType === 'hidden') {

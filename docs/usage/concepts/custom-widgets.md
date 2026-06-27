@@ -133,9 +133,126 @@ Registralo y usalo:
 </FormProvider>
 ```
 
-> Tu widget es **controlado**: lee `value` y reporta cambios con `onChange(name, value)`. No toca el store
-> directamente — eso lo maneja el controlador `<Field>` por vos (suscripción granular incluida). Ver
-> [Performance](./performance.md).
+> Tu widget es **controlado**: para SU propio valor, lee `value` y reporta con `onChange(name, value)` — no
+> toca el store directamente. Para leer/escribir **otros** campos o reaccionar al estado global, usá los
+> hooks (ver abajo). La suscripción granular la maneja el controlador `<Field>`. Ver [Performance](./performance.md).
+
+---
+
+## Componentes custom avanzados
+
+Acá está lo potente: un componente custom puede **componerse de los componentes de la librería**,
+**suscribirse al estado** del formulario por hooks, y **embeber otros campos** — y todo sigue respetando las
+reglas del `schema` (visibilidad condicional, dependencias). El patrón:
+
+- **El `schema`** declara el estado (los campos) y sus reglas (`if`/`then`/`else`, `required`, etc.).
+- **El `uiSchema`** dice qué campo usa tu widget custom (`ui:widget`).
+- **El registry `components`** asocia el nombre del widget a tu componente. *No hay que tocar nada más.*
+
+### 1) Componer componentes de la librería
+
+Importá los presentacionales built-in y los building-blocks (`FieldLabel`, `ErrorMessage`) desde el paquete:
+
+```tsx
+import { TextField, SelectField, CheckboxField, FieldLabel, ErrorMessage } from '@laus/uiform'
+```
+
+> Son **controlados**: les pasás `value` + `onChange(name, value)`. Su contrato `onChange` es
+> `(name, value)`, así que adaptá: `onChange={(_n, v) => onChange(name, v)}`.
+
+### 2) Suscribirse al estado (hooks)
+
+Desde cualquier componente dentro del `<FormProvider>`:
+
+| Hook | Para qué |
+|------|----------|
+| [`useWatch(name)`](../hooks/use-watch.md) | Leer el valor de **otro** campo (re-render solo si ESE cambia). |
+| [`useField(name)`](../hooks/use-field.md) | Leer **y escribir** cualquier campo (`{ value, error, touched, onChange, onBlur }`). |
+| [`useFormStore(selector)`](../hooks/use-form-store.md) | Acceso de bajo nivel al store con un selector. |
+
+```tsx
+import { useWatch } from '@laus/uiform'
+
+function Resumen() {
+  const nombre = useWatch('nombre') // se re-renderiza solo cuando cambia `nombre`
+  return <p>Hola {nombre || '—'}</p>
+}
+```
+
+### 3) Embeber otros campos (`<Field>`)
+
+Un componente custom puede renderizar **otros campos por su name** con `<Field>`. El campo embebido se
+auto-oculta si el `schema` lo marca oculto (`isVisible === false`), igual que en cualquier sección:
+
+```tsx
+import { Field } from '@laus/uiform'
+// dentro de tu componente:
+<Field name="detalle" />
+```
+
+> Si embebés un campo, **no lo pongas también en una sección** (`ui:sections`), o se renderiza dos veces.
+> Listá en la sección solo el campo "contenedor" (el que usa tu widget); los dependientes los pone tu componente.
+
+### Ejemplo completo: tarjeta con checkbox + campo condicional
+
+El caso clásico: una tarjeta con un checkbox; según esté tildado, abajo va un **input de texto** o un
+**select**. El checkbox dispara el `if`/`then`/`else` del `schema`, y la tarjeta agrupa todo visualmente.
+
+```tsx
+// schema: el estado + las reglas (qué se ve según el checkbox)
+const schema = {
+  type: 'object',
+  properties: {
+    usarLista: { type: 'boolean', title: '¿Elegir de una lista?' },
+    detalleTexto: { type: 'string', title: 'Detalle' },
+    detalleOpcion: { type: 'string', title: 'Opción', oneOf: [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }] },
+  },
+  allOf: [
+    {
+      if: { properties: { usarLista: { const: true } }, required: ['usarLista'] },
+      then: { properties: { detalleTexto: false } },  // tildado → oculta el texto
+      else: { properties: { detalleOpcion: false } }, // sin tildar → oculta el select
+    },
+  ],
+}
+
+// uiSchema: el checkbox usa el widget custom; los dependientes, sus widgets normales
+const uiSchema = {
+  'ui:sections': [{ id: 'pref', fields: ['usarLista'] }], // SOLO el checkbox en la sección
+  usarLista: { 'ui:widget': 'toggleCard' },
+  detalleTexto: { 'ui:widget': 'text' },
+  detalleOpcion: { 'ui:widget': 'select' },
+}
+```
+
+```tsx
+// widgets/ToggleCard.tsx — compone CheckboxField + embebe el campo dependiente
+import { Card } from 'antd'
+import { CheckboxField, Field, FieldLabel } from '@laus/uiform'
+
+export function ToggleCard({ name, value, label, required, onChange }: any) {
+  return (
+    <Card size="small">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <FieldLabel label={label} required={required} />
+        <CheckboxField name={name} value={value} onChange={(_n, v) => onChange(name, v)} />
+      </div>
+      {/* el schema decide cuál se ve; el oculto se renderiza como null solo */}
+      <Field name="detalleTexto" />
+      <Field name="detalleOpcion" />
+    </Card>
+  )
+}
+```
+
+```tsx
+<FormProvider schema={schema} uiSchema={uiSchema} components={{ toggleCard: ToggleCard }}>
+  <FormSection id="pref" />
+</FormProvider>
+```
+
+Al togglear el checkbox, el `schema` oculta un campo y muestra el otro **dentro de la misma tarjeta** —
+sin lógica de visibilidad en el componente. La tarjeta solo arma la UI; las reglas viven en el `schema`.
 
 ## Links
 

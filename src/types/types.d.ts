@@ -14,7 +14,11 @@ import type {
 import type { TextAreaProps } from "antd/es/input"
 
 // Base interface para todos los campos
-export interface BaseFieldProps extends Field {
+// Partial<Field>: las props ESTRUCTURALES del motor (type/jsonType/required/isVisible/…) son opcionales,
+// así un widget custom puede COMPONER los componentes de la librería pasando solo name/value/onChange.
+// Vía <Field> el controlador igual las provee todas. (feature: componentes custom)
+export interface BaseFieldProps extends Partial<Field> {
+  name: string
   value?: any
   error?: string | Record<string, any>
   submitted?: boolean
@@ -28,38 +32,38 @@ export interface BaseFieldProps extends Field {
 
 // Props específicos para cada tipo de campo
 export interface TextFieldProps extends BaseFieldProps, Omit<InputProps, 'onChange' | 'value'> {
-  inputType: 'text' | 'email' | 'hidden'
+  inputType?: 'text' | 'email' | 'hidden'
 }
 
 export interface NumberFieldProps extends BaseFieldProps, Omit<InputNumberProps, 'onChange' | 'value'> {
-  inputType: 'number' | 'money'
+  inputType?: 'number' | 'money'
 }
 
 export interface TextareaFieldProps extends BaseFieldProps, Omit<TextAreaProps, 'onChange' | 'value'> {
-  inputType: 'textarea'
+  inputType?: 'textarea'
   rows?: number
 }
 
 export interface SelectFieldProps extends BaseFieldProps, Omit<SelectProps, 'onChange' | 'value' | 'options'> {
-  inputType: 'select' | 'country'
+  inputType?: 'select' | 'country'
   multiple?: boolean
 }
 
 export interface AutocompleteFieldProps extends BaseFieldProps, Omit<AutoCompleteProps, 'onChange' | 'value' | 'options'> {
-  inputType: 'autocomplete'
+  inputType?: 'autocomplete'
 }
 
 export interface RadioFieldProps extends BaseFieldProps, Omit<RadioGroupProps, 'onChange' | 'value' | 'options'> {
-  inputType: 'radio'
+  inputType?: 'radio'
 }
 
 export interface CheckboxFieldProps extends BaseFieldProps, Omit<CheckboxProps, 'onChange' | 'checked'> {
-  inputType: 'checkbox'
+  inputType?: 'checkbox'
   checkboxValue?: any
 }
 
 export interface DateFieldProps extends BaseFieldProps, Omit<DatePickerProps, 'onChange' | 'value'> {
-  inputType: 'date'
+  inputType?: 'date'
   minDate?: string
   maxDate?: string
 }
@@ -85,20 +89,20 @@ export interface TimeFieldProps extends Omit<TimePickerProps, 'onChange' | 'valu
 }
 
 export interface FileFieldProps extends BaseFieldProps, Omit<UploadProps, 'onChange'> {
-  inputType: 'file'
+  inputType?: 'file'
   accept?: string
   maxFileSize?: number
   multiple?: boolean
 }
 
 export interface FieldsetFieldProps extends BaseFieldProps {
-  inputType: 'fieldset'
+  inputType?: 'fieldset'
   fields?: Field[]
   size?: 'default' | 'small'
 }
 
 export interface GroupArrayFieldProps extends BaseFieldProps {
-  inputType: 'group-array'
+  inputType?: 'group-array'
   fields?: Field[]
 }
 

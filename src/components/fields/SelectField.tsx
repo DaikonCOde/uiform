@@ -96,7 +96,7 @@ export function SelectField({
     return optionLabel.toLowerCase().includes(input.toLowerCase())
   }, [])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   const isSearchable = hasAsyncOptions ? !!searchable : showSearch
 

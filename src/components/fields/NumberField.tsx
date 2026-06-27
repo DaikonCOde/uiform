@@ -42,7 +42,7 @@ export function NumberField({
     onBlur?.(name)
   }, [name, onBlur, internalTouched])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   // Configuración específica para money
   const moneyConfig = inputType === 'money' ? {

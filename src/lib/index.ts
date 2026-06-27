@@ -69,6 +69,9 @@ export {
 } from '../components/fields'
 export { FIELD_COMPONENT_MAP } from '../components/form/fieldComponentMap'
 
+// ── Building blocks para COMPONER widgets custom (label + error consistentes con los built-in) ──
+export { FieldLabel, ErrorMessage } from '../components/commons'
+
 // ── Utilidades ──
 export { formValuesToJsonValues, getDefaultValuesFromFields } from '../utils/utils'
 

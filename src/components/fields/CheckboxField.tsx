@@ -51,7 +51,7 @@ export function CheckboxField({
     onBlur?.(name)
   }, [name, onBlur, internalTouched])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   // Checked: value-checkbox compara contra su const; booleano usa la veracidad del value.
   const isChecked = isValueCheckbox ? value === checkboxValue : Boolean(value)

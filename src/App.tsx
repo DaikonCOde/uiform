@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, ConfigProvider, Alert } from 'antd'
+import { Button, ConfigProvider, Alert, Card } from 'antd'
 import esES from 'antd/locale/es_ES'
 import 'dayjs/locale/es'
 import './App.css'
@@ -12,8 +12,28 @@ import {
   useFormStore,
   useFormApi,
   useSections,
+  // Building blocks para componer un widget custom:
+  CheckboxField,
+  Field,
+  FieldLabel,
 } from '@laus/uiform'
 import type { JsfObjectSchema, UiSchema, FormLayout, AsyncOptionsLoader } from '@laus/uiform'
+
+// ── Widget CUSTOM compuesto: tarjeta con checkbox + campo dependiente (texto o select) embebido.
+//    El schema decide cuál se ve; este componente solo arma la UI y compone piezas de la librería.
+function ToggleCard({ name, value, label, required, onChange }: any) {
+  return (
+    <Card size="small" style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <FieldLabel label={label} required={required} />
+        <CheckboxField name={name} value={value} onChange={(_n: string, v: any) => onChange(name, v)} />
+      </div>
+      {/* el oculto se renderiza como null solo (regla del schema) */}
+      <Field name="detalleTexto" />
+      <Field name="detalleOpcion" />
+    </Card>
+  )
+}
 
 /**
  * Playground de verificación de UIForm v2.
@@ -41,6 +61,18 @@ const schema: JsfObjectSchema = {
     facturaElectronica: { type: 'boolean', title: '¿Emitís factura electrónica?' },
     cuit: { type: 'string', title: 'CUIT', pattern: '^\\d{2}-\\d{8}-\\d{1}$' },
     acepta: { type: 'boolean', title: 'Acepto los términos y condiciones' },
+    // Widget custom: el checkbox decide si abajo va texto (input) o select.
+    usarLista: { type: 'boolean', title: 'Detalle: ¿elegir de una lista?' },
+    detalleTexto: { type: 'string', title: 'Detalle' },
+    detalleOpcion: {
+      type: 'string',
+      title: 'Detalle',
+      oneOf: [
+        { const: 'urgente', title: 'Urgente' },
+        { const: 'normal', title: 'Normal' },
+        { const: 'baja', title: 'Baja prioridad' },
+      ],
+    },
     // Contenedor: fieldset → objeto anidado.
     direccion: {
       type: 'object',
@@ -80,6 +112,12 @@ const schema: JsfObjectSchema = {
       then: { required: ['cuit'] },
       else: { properties: { cuit: false } },
     },
+    // Widget custom: usarLista=true → muestra el select y oculta el texto; y viceversa.
+    {
+      if: { properties: { usarLista: { const: true } }, required: ['usarLista'] },
+      then: { properties: { detalleTexto: false } },
+      else: { properties: { detalleOpcion: false } },
+    },
   ],
 }
 
@@ -89,6 +127,8 @@ const uiSchema: UiSchema = {
     { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad', 'usuario'] },
     { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento', 'hora'] },
     { id: 'extra', title: 'Información adicional', fields: ['bio', 'facturaElectronica', 'cuit', 'acepta'] },
+    // SOLO el checkbox en la sección; el ToggleCard embebe los dependientes (no van en ninguna sección).
+    { id: 'custom', title: 'Componente custom', fields: ['usarLista'] },
     // Esta sección overridea el grid global a 1 columna (contenedores a lo ancho).
     { id: 'contenedores', title: 'Dirección y contactos', fields: ['direccion', 'contactos'], layout: { columns: 1 } },
   ],
@@ -110,6 +150,9 @@ const uiSchema: UiSchema = {
   facturaElectronica: { 'ui:widget': 'checkbox' },
   cuit: { 'ui:widget': 'text', 'ui:placeholder': '20-12345678-3', 'ui:colSpan': 2, 'ui:errorMessages': { pattern: 'CUIT inválido (formato XX-XXXXXXXX-X)' } },
   acepta: { 'ui:widget': 'checkbox', 'ui:colSpan': 2 },
+  usarLista: { 'ui:widget': 'toggleCard' },
+  detalleTexto: { 'ui:widget': 'text', 'ui:placeholder': 'Escribí el detalle...' },
+  detalleOpcion: { 'ui:widget': 'select', 'ui:placeholder': 'Elegí una opción...' },
   direccion: {
     'ui:widget': 'fieldset',
     calle: { 'ui:widget': 'text', 'ui:placeholder': 'Av. Siempreviva' },
@@ -192,9 +235,13 @@ function FormBody() {
   const sections = useSections()
   return (
     <>
-      {sections.map((section) => (
-        <FormSection key={section.id} id={section.id} />
-      ))}
+      {sections
+        // detalleTexto/detalleOpcion no van en ninguna sección (los embebe ToggleCard) → caen en la
+        // sección implícita __default__; la salteamos para que no se rendericen sueltos.
+        .filter((section) => section.id !== '__default__')
+        .map((section) => (
+          <FormSection key={section.id} id={section.id} />
+        ))}
     </>
   )
 }
@@ -256,6 +303,7 @@ function App() {
           layout={layout}
           asyncLoaders={asyncLoaders}
           errorMessages={errorMessages}
+          components={{ toggleCard: ToggleCard }}
           config={{ validateTrigger: 'onSubmit' }}
           onSubmit={(json) => setSubmitted(json)}
         >

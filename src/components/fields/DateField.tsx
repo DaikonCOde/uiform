@@ -161,7 +161,7 @@ export function DateField({
     return showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD'
   }, [displayFormatProp, showTime])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   const {type, jsonType, _rootLayout, errorMessage, getFormValues,...filteredAntdProps} = antdProps
 

@@ -84,7 +84,7 @@ export function TimeField({
     }
   }, [value, displayFormat])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   const { type, jsonType, _rootLayout, errorMessage, getFormValues, ...filtered } = antdProps as any
 

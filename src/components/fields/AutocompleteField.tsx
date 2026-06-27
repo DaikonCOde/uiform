@@ -158,7 +158,7 @@ export const AutocompleteField = React.memo(function AutocompleteField({
     onBlur?.(name);
   }, [name, onBlur, internalTouched]);
 
-  if (!isVisible) return null;
+  if (isVisible === false) return null;
 
   const isSearchable = hasAsyncOptions ? searchable : true;
 

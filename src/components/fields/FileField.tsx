@@ -111,7 +111,7 @@ export function FileField({
     return false
   }, [maxFileSize, accept, beforeUpload, fileList])
 
-  if (!isVisible) return null
+  if (isVisible === false) return null
 
   // Props comunes para Upload
   // Remove 'type' from antdProps to avoid passing it to Upload
