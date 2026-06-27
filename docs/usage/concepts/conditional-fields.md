@@ -56,13 +56,20 @@ en el `required` del `if`. Es el error #1 con `if/then/else`.
 
 ## Qué pasa con el VALOR de un campo oculto
 
-Cuando un campo está oculto:
+Cuando un campo se oculta:
 
-- **No se valida** — el `then.required` no aplica, así que no bloquea el submit por estar vacío.
-- **No entra en el payload** del `onSubmit` — el motor lo excluye aunque hubiera quedado un valor viejo en
-  el estado. (Verificado: con el campo oculto, el payload sale limpio sin esa key.)
+- **Su valor se LIMPIA del estado**, al vacío según su tipo: `string → ""`, `number → null`,
+  `boolean → false`, `array → []`, `object → {}`. Así no arrastra el valor viejo: si vuelve a mostrarse,
+  aparece vacío.
+- **No se valida** — el `then.required` no aplica, así que no bloquea el submit por estar oculto.
+- **No entra en el payload** del `onSubmit` — el motor lo excluye.
 
-O sea: ocultar un campo lo saca del contrato de datos por completo, no solo de la vista.
+O sea: ocultar un campo lo saca del contrato de datos por completo (estado, validación y payload), no solo
+de la vista.
+
+> **Por qué se limpia:** evita mandar al backend datos de un camino que el usuario abandonó. Por ejemplo, en
+> un [componente custom](./custom-widgets.md#ejemplo-completo-tarjeta-con-checkbox--campo-condicional) que
+> intercambia entre un input y un select, al cambiar de uno a otro el valor del que se ocultó queda limpio.
 
 ## El grid: sin celdas fantasma
 

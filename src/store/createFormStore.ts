@@ -50,10 +50,23 @@ export function createFormStore(
   // según visibilidad (lo borra al ocultar), así que un campo condicional perdía su colSpan al mostrarse.
   // Esta versión estática persiste y la usa el grid. (fix colSpan de campo oculto)
   const fieldColSpans: FormState["fieldColSpans"] = {};
+  // Valor "vacío" ESTÁTICO por campo, leído del schema (el motor corrompe field.jsonType al ocultar:
+  // string → boolean), para limpiar el valor cuando el campo se oculta. (fix: limpiar valor al ocultar)
+  const fieldEmptyValues: Record<string, any> = {};
   const compiledProps = (internalSchema.properties ?? {}) as Record<string, Record<string, unknown>>;
   for (const name of Object.keys(compiledProps)) {
-    const lay = compiledProps[name]?.["x-jsf-layout"] as FormState["fieldColSpans"][string] | undefined;
+    const prop = compiledProps[name];
+    const lay = prop?.["x-jsf-layout"] as FormState["fieldColSpans"][string] | undefined;
     if (lay) fieldColSpans[name] = lay;
+    const rawType = prop?.type as string | string[] | undefined;
+    const ty = Array.isArray(rawType) ? rawType[0] : rawType;
+    const it = (prop?.["x-jsf-presentation"] as Record<string, unknown> | undefined)?.inputType as string | undefined;
+    fieldEmptyValues[name] =
+      it === "checkbox" || ty === "boolean" ? false
+      : it === "number" || it === "money" || ty === "number" || ty === "integer" ? null
+      : it === "group-array" || ty === "array" ? []
+      : it === "fieldset" || ty === "object" ? {}
+      : ""; // strings y demás
   }
 
   // Token de secuencia por loader: descarta respuestas async fuera de orden (la lenta vieja no pisa
@@ -80,6 +93,22 @@ export function createFormStore(
     return { json: json2, errors: res2.formErrors ?? {} };
   };
 
+  // Limpia en el estado el valor de los campos OCULTOS (isVisible===false), al vacío ESTÁTICO según el tipo.
+  // Así un campo que se oculta no arrastra su valor viejo (al re-mostrarse queda vacío). (fix: limpiar al ocultar)
+  const clearHiddenValues = (values: Record<string, any>, flds: any[]): Record<string, any> => {
+    let out = values;
+    for (const f of flds) {
+      if (f?.isVisible === false) {
+        const empty = f?.name in fieldEmptyValues ? fieldEmptyValues[f.name] : "";
+        const current = out[f?.name];
+        if (current !== undefined && current !== empty && current !== "") {
+          out = setPath(out, f.name, empty);
+        }
+      }
+    }
+    return out;
+  };
+
   return createStore<FormState>((set, get) => ({
     // ── Estructura (inmutable tras crear) ──
     fields,
@@ -104,18 +133,20 @@ export function createFormStore(
       // Re-derivamos los fields en CADA cambio: el motor muta isVisible/computedAttributes in-place según
       // los valores. deriveAndValidate asienta la visibilidad ANTES de armar el JSON (ver su comentario).
       const { json, errors: fresh } = deriveAndValidate(newValues, get().fields);
+      // Limpiamos el valor de los campos que quedaron ocultos (con la visibilidad ya asentada).
+      const cleared = clearHiddenValues(newValues, get().fields);
       // Lo que se MUESTRA (store.errors) se gobierna por validateTrigger; pero onChange recibe SIEMPRE
       // los errores frescos (para "deshabilitar submit si inválido"). Un solo set → un solo notify.
       const display =
         opts.config?.validateTrigger === "onChange" ? fresh : get().errors;
-      set({ values: newValues, errors: display });
+      set({ values: cleared, errors: display });
       opts.onChange?.(json, fresh);
     },
     // MERGE parcial (no replace) + re-derivación. (fix casos de uso: setValues pisaba todo)
     setValues: (values) => {
       const merged = { ...get().values, ...values };
       deriveAndValidate(merged, get().fields);
-      set({ values: merged });
+      set({ values: clearHiddenValues(merged, get().fields) });
     },
     // Hidratación para edición async: aplica `values` SIN pisar lo que el usuario ya tocó. (fix casos de uso)
     hydrate: (values) => {
@@ -125,7 +156,7 @@ export function createFormStore(
         if (!s.touched[key]) next[key] = values[key];
       }
       deriveAndValidate(next, s.fields);
-      set({ values: next });
+      set({ values: clearHiddenValues(next, s.fields) });
     },
     setTouched: (name) =>
       set((s) => ({ touched: { ...s.touched, [name]: true } })),

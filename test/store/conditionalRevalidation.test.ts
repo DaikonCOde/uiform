@@ -1,5 +1,5 @@
-// Al togglear la visibilidad, el JSON validado debe armarse con la visibilidad NUEVA, no la vieja:
-// un campo que reaparece con su valor NO debe disparar "Required", y uno que se oculta NO "Not allowed".
+// Al togglear la visibilidad, el JSON validado se arma con la visibilidad NUEVA (no la vieja): ocultar un
+// campo con valor NO debe disparar "Not allowed"; y su valor se LIMPIA del estado.
 import { describe, it, expect } from "vitest";
 import { createFormStore } from "../../src/store/createFormStore";
 import type { JsfObjectSchema } from "@laus/json-schema-form";
@@ -8,19 +8,24 @@ import type { UiSchema } from "../../src/store/types";
 const schema: JsfObjectSchema = {
   type: "object",
   additionalProperties: false,
-  properties: { A: { type: "boolean" }, field1: { type: "string" }, field2: { type: "string" } },
+  properties: { A: { type: "boolean" }, field2: { type: "string" } },
   allOf: [
-    { if: { properties: { A: { const: true } }, required: ["A"] }, then: { required: ["field2"] }, else: { properties: { field2: false } } },
-    { if: { properties: { A: { const: true } }, required: ["A"] }, then: { properties: { field1: false } }, else: { required: ["field1"] } },
+    // A=true → field2 visible; A=false → field2 oculto (no permitido).
+    {
+      if: { properties: { A: { const: true } }, required: ["A"] },
+      then: {},
+      else: { properties: { field2: false } },
+    },
   ],
 } as JsfObjectSchema;
 const uiSchema: UiSchema = {
-  "ui:sections": [{ id: "s", fields: ["A", "field1", "field2"] }],
-  A: { "ui:widget": "checkbox" }, field1: { "ui:widget": "text" }, field2: { "ui:widget": "text" },
+  "ui:sections": [{ id: "s", fields: ["A", "field2"] }],
+  A: { "ui:widget": "checkbox" },
+  field2: { "ui:widget": "text" },
 };
 
 describe("re-validación al togglear visibilidad", () => {
-  it("un campo que reaparece con su valor no dispara required ni not-allowed", () => {
+  it("ocultar un campo con valor lo limpia y NO dispara 'Not allowed'", () => {
     const store = createFormStore(schema, uiSchema, { config: { validateTrigger: "onChange" } } as any);
     const s = () => store.getState();
     const errF2 = () => (s().errors as Record<string, any>).field2 ?? null;
@@ -29,13 +34,8 @@ describe("re-validación al togglear visibilidad", () => {
     s().setValue("field2", "VALOR2");
     expect(errF2()).toBeNull(); // visible con valor → ok
 
-    s().setValue("A", false); // field2 se oculta (conserva valor)
-    expect(s().values.field2).toBe("VALOR2");
-    expect(errF2()).toBeNull(); // oculto → NO "Not allowed"
-
-    s().setValue("field1", "VALOR1");
-    s().setValue("A", true); // field2 reaparece con su valor
-    expect(s().values.field2).toBe("VALOR2");
-    expect(errF2()).toBeNull(); // ✅ antes: "Required field"
+    s().setValue("A", false); // field2 se oculta
+    expect(s().values.field2).toBe(""); // ✅ valor limpiado al ocultar
+    expect(errF2()).toBeNull(); // ✅ sin "Not allowed" (JSON con visibilidad nueva)
   });
 });
