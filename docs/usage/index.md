@@ -45,6 +45,7 @@ export const Demo = () => (
 | [Opciones async](./concepts/async-options.md) | Cargar opciones de Select/Autocomplete dinámicamente. |
 | [Cargar datos async](./concepts/loading-data.md) | Precargar un form de edición con `hydrate()` sin pisar lo tipeado. |
 | [Validación](./concepts/validation.md) | Cómo y cuándo se valida; errores y mensajes custom. |
+| [Campos condicionales](./concepts/conditional-fields.md) | Mostrar/ocultar campos según otro (`if`/`then`/`else`). |
 | [Mensajes de error](./concepts/error-messages.md) | Customizar y traducir mensajes (global + por campo, i18n). |
 | [Widgets custom](./concepts/custom-widgets.md) | Reemplazar o agregar widgets con la prop `components`. |
 | [Performance](./concepts/performance.md) | Suscripción granular y cómo evitar re-renders. |
@@ -79,7 +80,7 @@ export const Demo = () => (
 | [text](./widgets/text.md) · [number](./widgets/number.md) · [textarea](./widgets/textarea.md) | Inputs básicos. |
 | [select](./widgets/select.md) · [autocomplete](./widgets/autocomplete.md) | Selección con opciones. |
 | [radio](./widgets/radio.md) · [checkbox](./widgets/checkbox.md) | Booleanos y enums. |
-| [date](./widgets/date.md) · [file](./widgets/file.md) | Fecha y subida de archivos. |
+| [date](./widgets/date.md) · [time](./widgets/time.md) · [file](./widgets/file.md) | Fecha, hora y archivos. |
 | [fieldset](./widgets/fieldset.md) · [group-array](./widgets/group-array.md) | Contenedores anidados y repetibles. |
 
 ## Docs internos de diseño
