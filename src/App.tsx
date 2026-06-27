@@ -36,6 +36,7 @@ const schema: JsfObjectSchema = {
     ciudad: { type: 'string', title: 'Ciudad' },
     usuario: { type: 'string', title: 'Usuario (búsqueda en API)' },
     nacimiento: { type: 'string', title: 'Fecha de nacimiento' },
+    hora: { type: 'string', title: 'Hora preferida de contacto', format: 'time' },
     bio: { type: 'string', title: 'Bio', maxLength: 200 },
     facturaElectronica: { type: 'boolean', title: '¿Emitís factura electrónica?' },
     cuit: { type: 'string', title: 'CUIT', pattern: '^\\d{2}-\\d{8}-\\d{1}$' },
@@ -86,7 +87,7 @@ const schema: JsfObjectSchema = {
 const uiSchema: UiSchema = {
   'ui:sections': [
     { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad', 'usuario'] },
-    { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento'] },
+    { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento', 'hora'] },
     { id: 'extra', title: 'Información adicional', fields: ['bio', 'facturaElectronica', 'cuit', 'acepta'] },
     // Esta sección overridea el grid global a 1 columna (contenedores a lo ancho).
     { id: 'contenedores', title: 'Dirección y contactos', fields: ['direccion', 'contactos'], layout: { columns: 1 } },
@@ -104,9 +105,10 @@ const uiSchema: UiSchema = {
   ciudad: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá tu ciudad...', 'ui:options': { asyncOptions: { id: 'ciudades', searchable: true } } },
   usuario: { 'ui:widget': 'autocomplete', 'ui:placeholder': 'Buscá un usuario (JSONPlaceholder)...', 'ui:options': { asyncOptions: { id: 'usuarios', searchable: true } } },
   nacimiento: { 'ui:widget': 'date', 'ui:options': { format: 'DD/MM/YYYY' } },
+  hora: { 'ui:widget': 'time', 'ui:options': { format: 'HH:mm' } },
   bio: { 'ui:widget': 'textarea', 'ui:placeholder': 'Contanos algo...', 'ui:colSpan': 2 },
   facturaElectronica: { 'ui:widget': 'checkbox' },
-  cuit: { 'ui:widget': 'text', 'ui:placeholder': '20-12345678-3', 'ui:errorMessages': { pattern: 'CUIT inválido (formato XX-XXXXXXXX-X)' } },
+  cuit: { 'ui:widget': 'text', 'ui:placeholder': '20-12345678-3', 'ui:colSpan': 2, 'ui:errorMessages': { pattern: 'CUIT inválido (formato XX-XXXXXXXX-X)' } },
   acepta: { 'ui:widget': 'checkbox', 'ui:colSpan': 2 },
   direccion: {
     'ui:widget': 'fieldset',

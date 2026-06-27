@@ -7,6 +7,7 @@ export { AutocompleteField } from './AutocompleteField'
 export { RadioField } from './RadioField'
 export { CheckboxField } from './CheckboxField'
 export { DateField } from './DateField'
+export { TimeField } from './TimeField'
 export { FileField } from './FileField'
 export { FieldsetField } from './FieldsetField'
 export { GroupArrayField } from './GroupArrayField'
@@ -21,6 +22,7 @@ export type {
   RadioFieldProps,
   CheckboxFieldProps,
   DateFieldProps,
+  TimeFieldProps,
   FileFieldProps,
   FieldsetFieldProps,
   GroupArrayFieldProps,

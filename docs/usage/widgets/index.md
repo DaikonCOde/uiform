@@ -21,6 +21,7 @@ lo declarás, lo infiere del `schema`).
 | `radio` | `RadioField` (Radio.Group) | enum | [radio](./radio.md) |
 | `checkbox` | `CheckboxField` (Checkbox) | `boolean` (o value-checkbox) | [checkbox](./checkbox.md) |
 | `date` | `DateField` (DatePicker) | `string` (fecha) | [date](./date.md) |
+| `time` | `TimeField` (TimePicker) | `string` (hora `HH:mm:ss`) | [time](./time.md) |
 | `file` | `FileField` (Upload) | archivo(s) | [file](./file.md) |
 | `fieldset` | `FieldsetField` | `object` | [fieldset](./fieldset.md) |
 | `group-array` | `GroupArrayField` | `array` de `object` | [group-array](./group-array.md) |

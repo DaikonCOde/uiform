@@ -1,11 +1,12 @@
  
 import type { Field, FieldType as JSFFieldType, SchemaValue } from "@laus/json-schema-form"
-import type { 
-  InputProps, 
-  SelectProps, 
-  CheckboxProps, 
-  RadioGroupProps, 
+import type {
+  InputProps,
+  SelectProps,
+  CheckboxProps,
+  RadioGroupProps,
   DatePickerProps,
+  TimePickerProps,
   UploadProps,
   InputNumberProps,
   AutoCompleteProps
@@ -61,6 +62,26 @@ export interface DateFieldProps extends BaseFieldProps, Omit<DatePickerProps, 'o
   inputType: 'date'
   minDate?: string
   maxDate?: string
+}
+
+// `time` no es un FieldType nativo del motor → definimos las props explícitas (no derivamos de BaseFieldProps
+// para esquivar su index signature `[key:string]: unknown`, que vuelve unknown a value/onChange). (widget time)
+export interface TimeFieldProps extends Omit<TimePickerProps, 'onChange' | 'value' | 'status' | 'format'> {
+  name: string
+  label?: string
+  description?: string
+  value?: any
+  error?: string | Record<string, any>
+  submitted?: boolean
+  touched?: boolean
+  required?: boolean
+  isVisible?: boolean
+  inputType?: string
+  format?: string
+  onChange: (name: string, value: any) => void
+  onBlur?: (name: string) => void
+  className?: string
+  style?: React.CSSProperties
 }
 
 export interface FileFieldProps extends BaseFieldProps, Omit<UploadProps, 'onChange'> {
