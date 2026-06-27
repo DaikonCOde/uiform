@@ -46,6 +46,16 @@ export function createFormStore(
   // 2) Resolver secciones desde el x-jsf-sections que dejó el compilador. (ARCHITECTURE_V2.md §6)
   const sections = resolveSections(internalSchema, fields);
 
+  // 2 bis) colSpan ESTÁTICO por campo, del schema compilado (x-jsf-layout). El motor pone/saca field.layout
+  // según visibilidad (lo borra al ocultar), así que un campo condicional perdía su colSpan al mostrarse.
+  // Esta versión estática persiste y la usa el grid. (fix colSpan de campo oculto)
+  const fieldColSpans: FormState["fieldColSpans"] = {};
+  const compiledProps = (internalSchema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  for (const name of Object.keys(compiledProps)) {
+    const lay = compiledProps[name]?.["x-jsf-layout"] as FormState["fieldColSpans"][string] | undefined;
+    if (lay) fieldColSpans[name] = lay;
+  }
+
   // Token de secuencia por loader: descarta respuestas async fuera de orden (la lenta vieja no pisa
   // a la nueva). Sin esto, dos cargas concurrentes del mismo id ganan por orden de RESOLUCIÓN. (fix de revisión)
   const loadSeq: Record<string, number> = {};
@@ -57,6 +67,7 @@ export function createFormStore(
     sections,
     layout: layout ?? null,
     formLayout: opts.layout ?? null,
+    fieldColSpans,
 
     // ── Estado mutable ──
     values: getDefaultValuesFromFields(fields, opts.initialValues),

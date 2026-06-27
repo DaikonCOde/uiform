@@ -108,6 +108,10 @@ export interface FormState {
   sections: ResolvedSection[];
   layout: import("@laus/json-schema-form").JsfLayoutConfig | null; // x-jsf-layout del motor (interno)
   formLayout: FormLayout | null; // grid GLOBAL provisto por el consumidor (FormProvider.layout)
+  // colSpan ESTÁTICO por campo, leído del schema compilado (x-jsf-layout). El `field.layout` del motor
+  // aparece/desaparece según la visibilidad (lo borra al ocultar), así que NO sirve para el grid de un
+  // campo condicional; esta versión estática persiste y el grid la usa. (fix colSpan de campo oculto)
+  fieldColSpans: Record<string, import("@laus/json-schema-form").JsfLayoutConfig>;
 
   // ── Estado mutable ──
   values: Record<string, any>;
