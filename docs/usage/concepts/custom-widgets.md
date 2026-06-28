@@ -193,19 +193,30 @@ import { Field } from '@laus/uiform'
 > Si embebés un campo, **no lo pongas también en una sección** (`ui:sections`), o se renderiza dos veces.
 > Listá en la sección solo el campo "contenedor" (el que usa tu widget); los dependientes los pone tu componente.
 
-### Ejemplo completo: tarjeta con checkbox + campo condicional
+### Ejemplo completo: una fila "label + checkbox" y debajo un campo condicional
 
-El caso clásico: una tarjeta con un checkbox; según esté tildado, abajo va un **input de texto** o un
-**select**. El checkbox dispara el `if`/`then`/`else` del `schema`, y la tarjeta agrupa todo visualmente.
+El caso clásico: un label con un checkbox al lado; según esté tildado, abajo va un **input de texto** o un
+**select**. Se renderiza **como un campo cualquiera**: el framework NO le agrega UI (ni borde ni wrapper) y
+**hereda el `ui:colSpan`** del schema como cualquier otro campo.
+
+```
+Label                    [ ] checkbox
+[ input de texto ]                       ← sin tildar
+```
+
+> **Dos detalles de UI**: (1) el framework solo envuelve el campo en su celda de grid — el aspecto lo da
+> TU componente (si querés un borde, ponelo vos con un `Card`; si no, no aparece). (2) Para tener **un solo
+> label** (el del checkbox), los campos dependientes van **sin `title`** en el schema; así no renderizan el
+> suyo. `FieldLabel` no dibuja nada si no hay label.
 
 ```tsx
 // schema: el estado + las reglas (qué se ve según el checkbox)
 const schema = {
   type: 'object',
   properties: {
-    usarLista: { type: 'boolean', title: '¿Elegir de una lista?' },
-    detalleTexto: { type: 'string', title: 'Detalle' },
-    detalleOpcion: { type: 'string', title: 'Opción', oneOf: [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }] },
+    usarLista: { type: 'boolean', title: 'Detalle' }, // el ÚNICO title → es el label de la fila
+    detalleTexto: { type: 'string' },                 // sin title → sin label propio
+    detalleOpcion: { type: 'string', oneOf: [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }] },
   },
   allOf: [
     {
@@ -219,20 +230,19 @@ const schema = {
 // uiSchema: el checkbox usa el widget custom; los dependientes, sus widgets normales
 const uiSchema = {
   'ui:sections': [{ id: 'pref', fields: ['usarLista'] }], // SOLO el checkbox en la sección
-  usarLista: { 'ui:widget': 'toggleCard' },
+  usarLista: { 'ui:widget': 'toggleCard', 'ui:colSpan': 2 }, // hereda el colSpan como cualquier campo
   detalleTexto: { 'ui:widget': 'text' },
   detalleOpcion: { 'ui:widget': 'select' },
 }
 ```
 
 ```tsx
-// widgets/ToggleCard.tsx — compone CheckboxField + embebe el campo dependiente
-import { Card } from 'antd'
+// widgets/ToggleCard.tsx — SIN UI extra (no Card/borde); compone CheckboxField + embebe el dependiente
 import { CheckboxField, Field, FieldLabel } from '@laus/uiform'
 
 export function ToggleCard({ name, value, label, required, onChange }: any) {
   return (
-    <Card size="small">
+    <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <FieldLabel label={label} required={required} />
         <CheckboxField name={name} value={value} onChange={(_n, v) => onChange(name, v)} />
@@ -240,7 +250,7 @@ export function ToggleCard({ name, value, label, required, onChange }: any) {
       {/* el schema decide cuál se ve; el oculto se renderiza como null solo */}
       <Field name="detalleTexto" />
       <Field name="detalleOpcion" />
-    </Card>
+    </>
   )
 }
 ```
@@ -251,8 +261,9 @@ export function ToggleCard({ name, value, label, required, onChange }: any) {
 </FormProvider>
 ```
 
-Al togglear el checkbox, el `schema` oculta un campo y muestra el otro **dentro de la misma tarjeta** —
-sin lógica de visibilidad en el componente. La tarjeta solo arma la UI; las reglas viven en el `schema`.
+Al togglear el checkbox, el `schema` oculta un campo y muestra el otro —sin lógica de visibilidad en el
+componente. El componente solo arma la UI; las reglas viven en el `schema`. Y como cualquier campo, hereda
+su `ui:colSpan` y no se nota que es custom.
 
 ## Links
 

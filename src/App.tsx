@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, ConfigProvider, Alert, Card } from 'antd'
+import { Button, ConfigProvider, Alert } from 'antd'
 import esES from 'antd/locale/es_ES'
 import 'dayjs/locale/es'
 import './App.css'
@@ -19,19 +19,24 @@ import {
 } from '@laus/uiform'
 import type { JsfObjectSchema, UiSchema, FormLayout, AsyncOptionsLoader } from '@laus/uiform'
 
-// ── Widget CUSTOM compuesto: tarjeta con checkbox + campo dependiente (texto o select) embebido.
-//    El schema decide cuál se ve; este componente solo arma la UI y compone piezas de la librería.
+// ── Widget CUSTOM compuesto: SIN UI extra (no Card/borde) → se renderiza como un campo cualquiera y hereda
+//    el colSpan del schema. Una fila "label + checkbox" y debajo el campo dependiente (texto o select),
+//    embebido SIN su propio label (los dependientes no tienen `title` en el schema). El schema decide cuál
+//    se ve. El componente solo compone piezas de la librería.
 function ToggleCard({ name, value, label, required, onChange }: any) {
   return (
-    <Card size="small" style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <FieldLabel label={label} required={required} />
-        <CheckboxField name={name} value={value} onChange={(_n: string, v: any) => onChange(name, v)} />
+        <label>
+          <CheckboxField name={name} value={value} onChange={(_n: string, v: any) => onChange(name, v)} />
+            ¿Es sede tercero?
+        </label> 
       </div>
       {/* el oculto se renderiza como null solo (regla del schema) */}
       <Field name="detalleTexto" />
       <Field name="detalleOpcion" />
-    </Card>
+    </>
   )
 }
 
@@ -62,11 +67,11 @@ const schema: JsfObjectSchema = {
     cuit: { type: 'string', title: 'CUIT', pattern: '^\\d{2}-\\d{8}-\\d{1}$' },
     acepta: { type: 'boolean', title: 'Acepto los términos y condiciones' },
     // Widget custom: el checkbox decide si abajo va texto (input) o select.
-    usarLista: { type: 'boolean', title: 'Detalle: ¿elegir de una lista?' },
-    detalleTexto: { type: 'string', title: 'Detalle' },
+    usarLista: { type: 'boolean', title: 'Detalle' },
+    // Sin `title`: el label lo pone el ToggleCard una sola vez (al lado del checkbox).
+    detalleTexto: { type: 'string' },
     detalleOpcion: {
       type: 'string',
-      title: 'Detalle',
       oneOf: [
         { const: 'urgente', title: 'Urgente' },
         { const: 'normal', title: 'Normal' },
@@ -124,11 +129,10 @@ const schema: JsfObjectSchema = {
 // ── 2) uiSchema: presentación + GRID (colSpan por campo, layout por sección) ──
 const uiSchema: UiSchema = {
   'ui:sections': [
-    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad', 'usuario'] },
+    { id: 'datos', title: 'Datos personales', fields: ['nombre', 'email', 'edad', 'usuario', 'usarLista'] },
     { id: 'ubicacion', title: 'Ubicación', fields: ['pais', 'provincia', 'ciudad', 'nacimiento', 'hora'] },
     { id: 'extra', title: 'Información adicional', fields: ['bio', 'facturaElectronica', 'cuit', 'acepta'] },
-    // SOLO el checkbox en la sección; el ToggleCard embebe los dependientes (no van en ninguna sección).
-    { id: 'custom', title: 'Componente custom', fields: ['usarLista'] },
+    // SOLO el checkbox en la sección; el ToggleCard embebe los dependientes (no van en ninguna sección).s
     // Esta sección overridea el grid global a 1 columna (contenedores a lo ancho).
     { id: 'contenedores', title: 'Dirección y contactos', fields: ['direccion', 'contactos'], layout: { columns: 1 } },
   ],
@@ -150,7 +154,7 @@ const uiSchema: UiSchema = {
   facturaElectronica: { 'ui:widget': 'checkbox' },
   cuit: { 'ui:widget': 'text', 'ui:placeholder': '20-12345678-3', 'ui:colSpan': 2, 'ui:errorMessages': { pattern: 'CUIT inválido (formato XX-XXXXXXXX-X)' } },
   acepta: { 'ui:widget': 'checkbox', 'ui:colSpan': 2 },
-  usarLista: { 'ui:widget': 'toggleCard' },
+  usarLista: { 'ui:widget': 'toggleCard', 'ui:colSpan': 1 },
   detalleTexto: { 'ui:widget': 'text', 'ui:placeholder': 'Escribí el detalle...' },
   detalleOpcion: { 'ui:widget': 'select', 'ui:placeholder': 'Elegí una opción...' },
   direccion: {
@@ -169,7 +173,7 @@ const uiSchema: UiSchema = {
 }
 
 // ── Grid GLOBAL del formulario: 2 columnas (1 en mobile), gap 16px por default ──
-const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 2 } }
+const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 6 } }
 
 // ── Mensajes de validación globales (i18n) en español. Un campo puede overridear con ui:errorMessages ──
 const errorMessages: Record<string, string> = {
