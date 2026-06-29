@@ -1,4 +1,4 @@
-// Tests del widget `time` (TimePicker): display configurable, value canónico HH:mm:ss, keyword del schema.
+// Tests del widget `time` (TimePicker): display configurable, store wall-clock (HH:mm / HH:mm:ss), keyword del schema.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";

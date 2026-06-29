@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Widget de hora: TimePicker de AntD. El value se GUARDA como string canónico "HH:mm:ss" (válido para
-// JSON Schema format:"time"), independiente del formato de DISPLAY (ui:options.format). (widget time)
+// Widget de hora: TimePicker de AntD. El value se GUARDA wall-clock (sin zona) en el formato DECLARADO:
+// "HH:mm" si el campo es de hora-minuto, "HH:mm:ss" si maneja segundos. Independiente del DISPLAY
+// (ui:options.format). La validación del payload se declara con `pattern` en el schema, NO con
+// format:"time" (ese keyword es RFC 3339 full-time y EXIGE offset, que un wall-clock no tiene). (widget time)
 
 import { useState, useCallback, useMemo } from 'react'
 import { TimePicker } from 'antd'
@@ -16,8 +18,6 @@ dayjs.extend(customParseFormat)
 // colisiona con el `format` de DISPLAY (dayjs lo interpretaría como tokens → basura). Solo aceptamos como
 // display un string que NO sea un keyword del schema; el consumidor lo configura vía ui:options.format.
 const SCHEMA_FORMAT_KEYWORDS = new Set(['time', 'date', 'date-time'])
-// Formato canónico de almacenamiento (estable, parseable, válido para format:"time").
-const STORE_FORMAT = 'HH:mm:ss'
 // Formatos que intentamos parsear de un value entrante.
 const PARSE_FORMATS = ['HH:mm:ss', 'HH:mm', 'H:mm']
 
@@ -50,14 +50,19 @@ export function TimeField({
   // Display por defecto: HH:mm (o HH:mm:ss si se pide showSecond). El consumidor manda con ui:options.format.
   const displayFormat = displayFormatProp ?? (showSecond ? 'HH:mm:ss' : 'HH:mm')
 
+  // Store canónico 24h, sin zona: incluye segundos SOLO si el campo los maneja (showSecond o el display
+  // los muestra). Así el value coincide con lo declarado en el schema ("HH:mm" o "HH:mm:ss").
+  const usesSeconds = showSecond || /s/.test(displayFormat)
+  const storeFormat = usesSeconds ? 'HH:mm:ss' : 'HH:mm'
+
   const handleChange = useCallback(
     (time: dayjs.Dayjs | null) => {
       if (!internalTouched) setInternalTouched(true)
-      // Guardamos SIEMPRE en formato canónico, independiente del display. (value estable para validar)
-      const newValue = time && time.isValid() ? time.format(STORE_FORMAT) : null
+      // Guardamos en el formato declarado (wall-clock, 24h), independiente del display. (value estable para validar)
+      const newValue = time && time.isValid() ? time.format(storeFormat) : null
       onChange(name, newValue)
     },
-    [name, onChange, internalTouched],
+    [name, onChange, internalTouched, storeFormat],
   )
 
   const handleBlur = useCallback(() => {

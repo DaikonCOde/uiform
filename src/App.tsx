@@ -61,7 +61,10 @@ const schema: JsfObjectSchema = {
     ciudad: { type: 'string', title: 'Ciudad' },
     usuario: { type: 'string', title: 'Usuario (búsqueda en API)' },
     nacimiento: { type: 'string', title: 'Fecha de nacimiento' },
-    hora: { type: 'string', title: 'Hora preferida de contacto', format: 'time' },
+    // Wall-clock (sin zona): confiamos en el widget igual que `date` (sin keyword `format`).
+    // NO uses format:"time": es RFC 3339 y exige offset, que un wall-clock no tiene. Si querés validar
+    // el payload, agregá un `pattern` HH:mm: '^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$'.
+    hora: { type: 'string', title: 'Hora preferida de contacto' },
     bio: { type: 'string', title: 'Bio', maxLength: 200 },
     facturaElectronica: { type: 'boolean', title: '¿Emitís factura electrónica?' },
     cuit: { type: 'string', title: 'CUIT', pattern: '^\\d{2}-\\d{8}-\\d{1}$' },
@@ -173,7 +176,7 @@ const uiSchema: UiSchema = {
 }
 
 // ── Grid GLOBAL del formulario: 2 columnas (1 en mobile), gap 16px por default ──
-const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 6 } }
+const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 2 } }
 
 // ── Mensajes de validación globales (i18n) en español. Un campo puede overridear con ui:errorMessages ──
 const errorMessages: Record<string, string> = {
