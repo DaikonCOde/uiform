@@ -1,6 +1,6 @@
 {
   "name": "@laus/uiform",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "A React form library built on JSON Schema with Ant Design components and responsive layouts",
   "type": "module",
   "main": "./dist/uiform.umd.cjs",
