@@ -130,4 +130,42 @@ describe("AutocompleteField vía <Field> (Fase 4)", () => {
     expect(lastCall).toHaveProperty("search");
     expect(lastCall.search).toContain("Uru");
   });
+
+  it("respeta minSearchLength: no recarga el loader hasta alcanzar el umbral de caracteres", async () => {
+    const user = userEvent.setup();
+    const loader = makeLoader();
+    const schemaWithThreshold: JsfObjectSchema = {
+      type: "object",
+      properties: {
+        pais: {
+          type: "string",
+          title: "Pais",
+          "x-jsf-presentation": {
+            inputType: "autocomplete",
+            asyncOptions: { id: "paises", minSearchLength: 3 },
+          },
+        },
+      },
+    } as JsfObjectSchema;
+
+    render(
+      <FormProvider schema={schemaWithThreshold} asyncLoaders={{ paises: loader }}>
+        <Field name="pais" />
+      </FormProvider>,
+    );
+
+    // Carga inicial al montar.
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
+
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.type(input, "Ur"); // 2 caracteres, por debajo del umbral
+
+    // Tiempo de sobra al debounce (250ms): no debe recargar el loader.
+    await new Promise((r) => setTimeout(r, 400));
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    await user.type(input, "u"); // 3 caracteres, alcanza el umbral
+    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+  });
 });

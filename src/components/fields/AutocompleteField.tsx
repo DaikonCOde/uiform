@@ -71,6 +71,8 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   const hasAsyncOptions = !!asyncLoaderId;
   // searchable: por default el autocomplete busca; respeta el flag explícito del schema si está.
   const searchable = (asyncOptions as any)?.searchable ?? true;
+  // Umbral mínimo de caracteres antes de disparar el loader (default 0 = comportamiento previo, sin regresión).
+  const minSearchLength = (asyncOptions as any)?.minSearchLength ?? 0;
 
   // Suscripción granular a async[loaderId] + recarga al cambiar deps; warning dev si el id no resuelve loader.
   const {
@@ -118,10 +120,11 @@ export const AutocompleteField = React.memo(function AutocompleteField({
   const handleSearch = useCallback(
     (searchValue: string) => {
       if (!hasAsyncOptions || !searchable) return;
+      if (searchValue.length < minSearchLength) return;
       if (searchTimer.current) clearTimeout(searchTimer.current);
       searchTimer.current = setTimeout(() => reload(searchValue), 250);
     },
-    [hasAsyncOptions, searchable, reload],
+    [hasAsyncOptions, searchable, minSearchLength, reload],
   );
 
   // Limpia el timer pendiente al desmontar para no llamar reload sobre un componente muerto.

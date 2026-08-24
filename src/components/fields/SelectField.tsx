@@ -63,6 +63,8 @@ export function SelectField({
   const asyncLoaderId = asyncOptions?.id
   const hasAsyncOptions = !!asyncLoaderId
   const searchable = (asyncOptions as any)?.searchable
+  // Umbral mínimo de caracteres antes de disparar el loader (default 0 = comportamiento previo, sin regresión).
+  const minSearchLength = (asyncOptions as any)?.minSearchLength ?? 0
 
   // Suscripción granular a async[loaderId] + recarga al cambiar deps; inerte si no hay loaderId.
   const {
@@ -76,9 +78,10 @@ export function SelectField({
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleSearch = useCallback((searchValue: string) => {
     if (!hasAsyncOptions || !searchable) return
+    if (searchValue.length < minSearchLength) return
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => reload(searchValue), 250)
-  }, [hasAsyncOptions, searchable, reload])
+  }, [hasAsyncOptions, searchable, minSearchLength, reload])
 
   // Si el field es async, la fuente es SIEMPRE el store (aunque venga vacío): así una búsqueda con 0
   // resultados muestra notFoundContent y no cae a las estáticas (opciones stale). Estáticas solo sin async.
@@ -109,7 +112,7 @@ export function SelectField({
     onChange: handleChange,
     onBlur: handleBlur,
     placeholder: placeholder || `Seleccioná ${inputType === 'country' ? 'un país' : 'una opción'}...`,
-    disabled: disabled || loading,
+    disabled: disabled,
     mode: multiple ? ('multiple' as const) : undefined,
     allowClear,
     showSearch: isSearchable,
