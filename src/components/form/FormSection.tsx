@@ -60,7 +60,7 @@ export function FormSection({ id, className, style, children }: FormSectionProps
   // lleva su clase de colSpan; sin layout, se apilan sin contenedor de grid.
   return (
     <div className={className} style={style}>
-      {section.title && <h3>{section.title}</h3>}
+      {section.title && <h4 className="font-semibold mb-3">{section.title}</h4>}
       {section.description && <p>{section.description}</p>}
       <div className={layout ? containerClassName : undefined}>
         {section.fieldNames.map((name) =>
