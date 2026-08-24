@@ -40,6 +40,8 @@ export function createFormStore(
       strictInputType: false,
       initialValues: opts.initialValues,
       asyncLoaders: opts.asyncLoaders,
+      // i18n a nivel librería: mensajes de validación en español por defecto (overridable a "en").
+      locale: opts.locale ?? "es",
     },
   );
 

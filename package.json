@@ -43,7 +43,7 @@
     }
   },
   "dependencies": {
-    "@laus/json-schema-form": "^1.2.4",
+    "@laus/json-schema-form": "^1.3.0",
     "dayjs": "^1.11.18",
     "use-sync-external-store": "^1.6.0",
     "zustand": "^5.0.14"

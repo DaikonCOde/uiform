@@ -178,15 +178,8 @@ const uiSchema: UiSchema = {
 // ── Grid GLOBAL del formulario: 2 columnas (1 en mobile), gap 16px por default ──
 const layout: FormLayout = { gap: '16px', responsive: { sm: 1, md: 2 } }
 
-// ── Mensajes de validación globales (i18n) en español. Un campo puede overridear con ui:errorMessages ──
-const errorMessages: Record<string, string> = {
-  required: 'Este campo es obligatorio',
-  format: 'El formato no es válido',
-  type: 'El valor no es del tipo esperado',
-  minimum: 'El valor es demasiado bajo',
-  maximum: 'El valor es demasiado alto',
-  pattern: 'El formato no es válido',
-}
+// Los mensajes de validación en español los provee la librería por defecto (locale "es" del motor,
+// con interpolación de valores). Un campo puede overridear un mensaje puntual con `ui:errorMessages`.
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -309,7 +302,6 @@ function App() {
           uiSchema={uiSchema}
           layout={layout}
           asyncLoaders={asyncLoaders}
-          errorMessages={errorMessages}
           components={{ toggleCard: ToggleCard }}
           config={{ validateTrigger: 'onSubmit' }}
           onSubmit={(json) => setSubmitted(json)}

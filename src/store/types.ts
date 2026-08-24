@@ -7,6 +7,7 @@ import type {
   FormErrors,
   JsfObjectSchema,
   AsyncOptionsLoader,
+  Locale,
 } from "@laus/json-schema-form";
 import type { UIFormConfig } from "../types/types.d";
 
@@ -92,6 +93,10 @@ export interface FormStoreOptions {
   initialValues?: Record<string, any>;
   asyncLoaders?: Record<string, AsyncOptionsLoader>;
   layout?: FormLayout; // grid GLOBAL del formulario (default de todas las secciones)
+  // Idioma de los mensajes de validación built-in del motor. Default de la librería: "es".
+  // Un campo puede overridear un mensaje puntual con `ui:errorMessages`; para textos globales
+  // custom (i18n propio) usá `errorMessages`.
+  locale?: Locale;
   // Mensajes de error globales (i18n): { [tipoDeValidación]: mensaje }. Se aplican a TODOS los campos;
   // un campo puede sobreescribirlos con `ui:errorMessages` en el uiSchema.
   errorMessages?: Record<string, string>;
